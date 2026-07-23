@@ -11,7 +11,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" />
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
         /* ======================== ROOT VARIABLES ======================== */
@@ -2632,13 +2631,6 @@
             <input type="email" id="authEmail" placeholder="Email" style="width:100%;margin-bottom:6px;font-size:0.75rem;">
             <input type="password" id="authPass" placeholder="Password" style="width:100%;margin-bottom:10px;font-size:0.75rem;">
             <button class="btn btn-green" id="authActionBtn" style="width:100%;justify-content:center;padding:8px;font-size:0.75rem;" onclick="registerEmailAccount()">Create Account</button>
-            <div style="display:flex;align-items:center;gap:6px;margin:10px 0;">
-                <hr style="flex:1;border:none;border-top:1px solid var(--border);">
-                <span style="font-size:0.55rem;color:var(--text-muted);">OR</span>
-                <hr style="flex:1;border:none;border-top:1px solid var(--border);">
-            </div>
-            <div id="g_id_onload" data-client_id="492912530380-8uaepnmuolbif765dbhfcvb2idokp5gr.apps.googleusercontent.com" data-callback="handleGoogleSignIn" data-auto_prompt="false"></div>
-            <div class="g_id_signin" data-type="standard" data-size="large" data-theme="dark" data-text="continue_with" data-shape="rectangular" data-logo_alignment="left"></div>
             <button class="btn" style="width:100%;justify-content:center;margin-top:8px;padding:6px;font-size:0.7rem;" onclick="closeModal('authModal')">Cancel</button>
         </div>
     </div>
@@ -3842,66 +3834,6 @@
             closeModal('authModal');
             updateUI();
             saveState();
-        }
-
-        function handleGoogleSignIn(response) {
-            try {
-                const base64Url = response.credential.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0)
-                    .toString(16)).slice(-2)).join(''));
-                const googleUser = JSON.parse(jsonPayload);
-                const email = googleUser.email;
-                const googleName = googleUser.given_name || googleUser.name || 'Player';
-
-                if (isEmailRegistered(email)) {
-                    const existingUser = findUserByEmail(email);
-                    if (existingUser) {
-                        currentUser.name = existingUser.username;
-                        currentUser.isLoggedIn = true;
-                        currentUser.level = 'Starter';
-                        currentUser.email = email;
-                        currentUser.password = existingUser.password || '';
-                        userBalance = 0;
-                        triggerToast(`Welcome back, ${currentUser.name}! 🔄`, 'win');
-                        closeModal('authModal');
-                        updateUI();
-                        saveState();
-                        return;
-                    }
-                }
-
-                let chosenName = document.getElementById('regUsername').value.trim() || googleName;
-                let baseName = chosenName;
-                let counter = 1;
-                while (isUsernameTaken(chosenName)) {
-                    chosenName = baseName + counter;
-                    counter++;
-                }
-
-                const password = 'google_' + Math.random().toString(36).slice(-8);
-
-                if (!registerUsername(chosenName, email, password)) {
-                    triggerToast('Failed to register', 'loss');
-                    return;
-                }
-
-                currentUser.name = chosenName;
-                currentUser.isLoggedIn = true;
-                currentUser.level = 'Starter';
-                currentUser.email = email;
-                currentUser.password = password;
-                userBalance = 0;
-
-                triggerToast(`Welcome ${chosenName}! 🎲 Start playing!`, 'win');
-                closeModal('authModal');
-                updateUI();
-                saveState();
-                fireConfetti(20);
-            } catch (e) {
-                triggerToast('Sign-in processed', 'gold');
-                closeModal('authModal');
-            }
         }
 
         function handleLogout() {
