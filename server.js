@@ -132,11 +132,14 @@ const betnex = new Betnex(process.env.BETNEX_API_KEY || 'test-key', { debug: fal
 // Get games list
 app.get('/api/provider/games', authenticateToken, async (req, res) => {
     try {
+        console.log('📡 Fetching Betnex games...');
         const providers = await betnex.getProviders();
+        console.log('✅ Providers:', providers);
         const games = await betnex.getGames(providers[0]);
+        console.log('✅ Games loaded:', games.length);
         res.json({ success: true, providers, games });
     } catch (error) {
-        console.error('Betnex games error:', error.message);
+        console.error('❌ Betnex games error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
