@@ -2788,10 +2788,9 @@
         }
 
         // ======================================================
-        // 3. AUTH FUNCTIONS - REPLACING localStorage ones
+        // 3. AUTH FUNCTIONS
         // ======================================================
 
-        // REGISTER - New version using API
         function registerEmailAccount() {
             const username = document.getElementById('regUsername').value.trim();
             const email = document.getElementById('authEmail').value.trim();
@@ -2831,7 +2830,6 @@
             });
         }
 
-        // LOGIN - New version using API
         function loginAccount() {
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPass').value.trim();
@@ -2862,7 +2860,6 @@
             });
         }
 
-        // LOGOUT - New version
         function handleLogout() {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Already logged out', 'gold');
@@ -2883,10 +2880,79 @@
         }
 
         // ======================================================
-        // 4. GAME FUNCTIONS - REPLACING localStorage ones
+        // 4. BETNEX GAME FUNCTIONS (NEW!)
         // ======================================================
 
-        // PLINKO
+        // Load games from Betnex
+        async function loadBetnexGames() {
+            try {
+                const response = await apiCall('/provider/games');
+                const games = response.games || [];
+                const container = document.getElementById('betnexGamesContainer');
+                
+                if (!container) return;
+                
+                if (games.length === 0) {
+                    container.innerHTML = '<p style="color:var(--text-muted);">No games available. Add your Betnex API key!</p>';
+                    return;
+                }
+                
+                container.innerHTML = '';
+                games.slice(0, 12).forEach(game => {
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        background: var(--bg-card);
+                        border: 1px solid var(--border);
+                        border-radius: 10px;
+                        padding: 15px;
+                        width: 150px;
+                        text-align: center;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    `;
+                    card.onmouseenter = () => { card.style.transform = 'scale(1.05)'; card.style.borderColor = 'var(--brand-green)'; };
+                    card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.borderColor = 'var(--border)'; };
+                    
+                    card.innerHTML = `
+                        <div style="font-size:2rem; margin-bottom:5px;">🎰</div>
+                        <div style="font-size:0.7rem; font-weight:700;">${game.name || 'Game'}</div>
+                        <div style="font-size:0.5rem; color:var(--text-muted);">${game.provider || ''}</div>
+                        <button class="btn btn-green" style="margin-top:8px; width:100%; justify-content:center; font-size:0.6rem;" onclick="launchBetnexGame('${game.id}')">Play</button>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Failed to load games:', error);
+                const container = document.getElementById('betnexGamesContainer');
+                if (container) {
+                    container.innerHTML = '<p style="color:var(--text-muted);">Failed to load games. Make sure Betnex is configured.</p>';
+                }
+            }
+        }
+
+        // Launch a Betnex game
+        async function launchBetnexGame(gameId) {
+            try {
+                const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+                if (!bet || bet <= 0) return;
+                
+                const response = await apiCall('/provider/launch', {
+                    method: 'POST',
+                    body: JSON.stringify({ gameId, bet })
+                });
+                
+                // Open game in new window
+                window.open(response.gameUrl, '_blank');
+                
+            } catch (error) {
+                alert('Error launching game: ' + error.message);
+            }
+        }
+
+        // ======================================================
+        // 5. GAME FUNCTIONS (PLINKO, MINES, SLOTS, ETC.)
+        // ======================================================
+
         function dropPlinko() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(document.getElementById('plinkoBet').value);
@@ -2931,249 +2997,8 @@
             });
         }
 
-        // MINES
-        function startMines() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('minesBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            minesBet = bet;
-            updateBalance();
-
-            const bombsCount = parseInt(document.getElementById('minesBombs').value);
-            minesState = Array(25).fill('gem');
-            let placed = 0;
-            while (placed < bombsCount) {
-                const r = Math.floor(Math.random() * 25);
-                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
-            }
-
-            safeRevealed = 0;
-            minesActive = true;
-            initMinesGrid();
-
-            document.getElementById('startMinesBtn').style.display = 'none';
-            document.getElementById('cashoutMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
-        }
-
-        function pickMine(idx, el) {
-            if (!minesActive || el.classList.contains('revealed-gem')) return;
-
-            if (minesState[idx] === 'bomb') {
-                el.classList.add('revealed-bomb');
-                el.textContent = '💣';
-                minesActive = false;
-                triggerToast('💥 Hit a mine!', 'loss');
-                playSound('loss');
-                addBetHistory('Mines', minesBet, 0, false);
-                document.getElementById('startMinesBtn').style.display = 'block';
-                document.getElementById('cashoutMinesBtn').style.display = 'none';
-                updateDegenerateStats();
-                saveState();
-            } else {
-                el.classList.add('revealed-gem');
-                el.textContent = '💎';
-                safeRevealed++;
-                const mult = (1 + safeRevealed * 0.2);
-                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
-            }
-        }
-
-        function cashoutMines() {
-            if (!minesActive) return;
-            const mult = (1 + safeRevealed * 0.2);
-            const win = minesBet * mult;
-            userBalance += win;
-            updateBalance();
-            minesActive = false;
-            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
-            playSound('win');
-            fireConfetti(15);
-            addTopMultiplier(currentUser.name, win, mult);
-            addBetHistory('Mines', minesBet, win, true);
-            addTransaction('game_win', win, 'Mines win');
-            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
-            document.getElementById('startMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').style.display = 'none';
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // SLOTS
-        function spinSlots() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('slotsBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const s1 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s2 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s3 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-
-            document.getElementById('r1').textContent = s1;
-            document.getElementById('r2').textContent = s2;
-            document.getElementById('r3').textContent = s3;
-
-            let mult = 0;
-            if (s1 === s2 && s2 === s3) mult = 5.0;
-            else if (s1 === s2 || s2 === s3) mult = 1.5;
-
-            if (mult > 0) {
-                const win = bet * mult;
-                userBalance += win;
-                triggerToast(`🎰 +$${win.toFixed(2)}!`, 'win');
-                playSound('win');
-                if (mult >= 5) {
-                    fireConfetti(50);
-                    playSound('jackpot');
-                    addTopMultiplier(currentUser.name, win, mult);
-                } else {
-                    fireConfetti(15);
-                }
-                addBetHistory('Slots', bet, win, true);
-                addTransaction('game_win', win, 'Slots win');
-                recordLiveBet('Slots', currentUser.name, bet, mult, true);
-            } else {
-                triggerToast(`💔 No win this time`, 'loss');
-                playSound('loss');
-                addBetHistory('Slots', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // DICE
-        function rollDice() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('diceBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            const roll = (Math.random() * 100).toFixed(2);
-            document.getElementById('diceResultDisplay').textContent = roll;
-
-            const win = parseFloat(roll) < 50;
-            if (win) {
-                const winAmt = bet * 1.98;
-                userBalance += winAmt;
-                triggerToast(`🎲 +$${winAmt.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addTopMultiplier(currentUser.name, winAmt, 1.98);
-                addBetHistory('Dice', bet, winAmt, true);
-                addTransaction('game_win', winAmt, 'Dice win');
-                recordLiveBet('Dice', currentUser.name, bet, 1.98, true);
-            } else {
-                triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Dice', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // CRASH
-        let crashActive = false;
-        let crashMultiplier = 1.0;
-        let crashInterval = null;
-        let crashBetAmount = 0;
-        let crashCashedOut = false;
-
-        function resetCrash() {
-            crashActive = false;
-            crashMultiplier = 1.0;
-            crashCashedOut = false;
-            if (crashInterval) { clearInterval(crashInterval); crashInterval = null; }
-            document.getElementById('crashMultiplierDisplay').textContent = '1.00x';
-            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
-            document.getElementById('crashBarFill').style.width = '0%';
-            document.getElementById('crashStatus').textContent = 'Place your bet and watch the multiplier climb!';
-            document.getElementById('crashStartBtn').style.display = 'inline-flex';
-            document.getElementById('crashCashoutBtn').style.display = 'none';
-        }
-
-        function startCrash() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            if (crashActive) { triggerToast('Game already running!', 'gold'); return; }
-
-            const bet = parseFloat(document.getElementById('crashBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            crashBetAmount = bet;
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            crashActive = true;
-            crashMultiplier = 1.0;
-            crashCashedOut = false;
-            document.getElementById('crashStartBtn').style.display = 'none';
-            document.getElementById('crashCashoutBtn').style.display = 'inline-flex';
-            document.getElementById('crashStatus').textContent = '🚀 Flying...';
-            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
-
-            const crashPoint = 1.0 + Math.random() * 14;
-
-            crashInterval = setInterval(() => {
-                crashMultiplier += 0.01;
-                const displayMult = crashMultiplier.toFixed(2);
-                document.getElementById('crashMultiplierDisplay').textContent = displayMult + 'x';
-                document.getElementById('crashBarFill').style.width = Math.min((crashMultiplier / 15) * 100, 100) + '%';
-
-                if (crashMultiplier >= crashPoint) {
-                    clearInterval(crashInterval);
-                    crashInterval = null;
-                    crashActive = false;
-                    document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display crashed';
-                    document.getElementById('crashStatus').textContent = `💥 Crashed at ${crashMultiplier.toFixed(2)}x!`;
-                    document.getElementById('crashStartBtn').style.display = 'inline-flex';
-                    document.getElementById('crashCashoutBtn').style.display = 'none';
-
-                    if (!crashCashedOut) {
-                        triggerToast(`💥 Crashed at ${crashMultiplier.toFixed(2)}x! Lost $${crashBetAmount.toFixed(2)}`, 'loss');
-                        playSound('loss');
-                        addBetHistory('Crash', crashBetAmount, 0, false);
-                    }
-                    updateDegenerateStats();
-                    saveState();
-                }
-            }, 50);
-        }
-
-        function cashoutCrash() {
-            if (!crashActive || crashCashedOut) return;
-            crashCashedOut = true;
-            const win = crashBetAmount * crashMultiplier;
-            userBalance += win;
-            updateBalance();
-            triggerToast(`💎 Cashed out at ${crashMultiplier.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
-            playSound('win');
-            fireConfetti(30);
-            addTopMultiplier(currentUser.name, win, crashMultiplier);
-            addBetHistory('Crash', crashBetAmount, win, true);
-            addTransaction('game_win', win, 'Crash win');
-            recordLiveBet('Crash', currentUser.name, crashBetAmount, crashMultiplier, true);
-            document.getElementById('crashCashoutBtn').style.display = 'none';
-            document.getElementById('crashStatus').textContent = `✅ Cashed out at ${crashMultiplier.toFixed(2)}x!`;
-            updateDegenerateStats();
-            saveState();
-        }
-
         // ======================================================
-        // 5. ALL ORIGINAL FUNCTIONS BELOW (Keep them as they are)
+        // 6. ALL ORIGINAL FUNCTIONS BELOW
         // ======================================================
 
         // NAME ARRAYS
@@ -3941,6 +3766,11 @@
                 if (loginBtn) loginBtn.style.display = 'inline-flex';
                 if (registerBtn) registerBtn.style.display = 'inline-flex';
             }
+            
+            // Load Betnex games when logged in
+            if (currentUser.isLoggedIn) {
+                loadBetnexGames();
+            }
         }
 
         function showLoading(show) {
@@ -4463,7 +4293,21 @@
                 const block = document.createElement('div');
                 block.className = 'section-block';
 
-                block.innerHTML = `
+                // Add Betnex games container after the first section
+                if (sec.id === 'trending') {
+                    block.innerHTML += `
+                        <div style="margin-top:20px;">
+                            <div class="section-heading">
+                                <div class="section-title-text">🎰 Casino Games</div>
+                            </div>
+                            <div id="betnexGamesContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
+                                <p style="color:var(--text-muted);">Loading games...</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                block.innerHTML += `
                     <div class="section-heading">
                         <div class="section-title-text">${sec.title}</div>
                         ${filter === 'all' ? `<div class="see-all-link" onclick="filterCategory('${sec.id}')">See All (${sec.games.length}) →</div>` : ''}
@@ -4627,413 +4471,80 @@
         // SLOTS SYMBOLS
         const slotSyms = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
 
-        // HI-LO
-        let hiloStreak = 0;
-        let hiloCurrentCard = null;
-        let hiloBetAmount = 1.0;
-        let hiloInProgress = false;
-
-        function launchHilo() {
+        function startMines() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('minesBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
 
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay open';
-            modal.id = 'hiloModal';
-            modal.innerHTML = `
-                <div class="modal-card enhanced" style="max-width:400px;">
-                    <div class="modal-header">
-                        <h3>🃏 Hi-Lo Challenge</h3>
-                        <span style="cursor:pointer;color:var(--text-muted);position:absolute;top:16px;right:20px;" onclick="document.getElementById('hiloModal').remove()">✕</span>
-                    </div>
-                    <div style="text-align:center;padding:20px 0;">
-                        <div style="font-size:4rem;margin-bottom:10px;" id="hiloCard">🃏</div>
-                        <div style="font-size:1.2rem;font-weight:900;color:var(--brand-gold);" id="hiloValue">? (1-13)</div>
-                        <div style="display:flex;gap:12px;justify-content:center;margin:16px 0;">
-                            <button class="btn btn-primary" onclick="playHilo('higher')">⬆ Higher</button>
-                            <button class="btn btn-red" onclick="playHilo('lower')">⬇ Lower</button>
-                        </div>
-                        <div style="font-size:0.7rem;color:var(--text-muted);">Current bet: $<span id="hiloBetDisplay">1.00</span></div>
-                        <div style="margin:8px 0;">
-                            <input type="number" id="hiloBetInput" value="1.00" min="0.10" step="0.5" style="width:100px;text-align:center;">
-                            <div class="quick-bets" style="justify-content:center;">
-                                <button class="btn" onclick="quickBet('hiloBetInput',25)">25%</button>
-                                <button class="btn" onclick="quickBet('hiloBetInput',50)">50%</button>
-                                <button class="btn" onclick="quickBet('hiloBetInput',75)">75%</button>
-                                <button class="btn" onclick="quickBet('hiloBetInput',100)">100%</button>
-                            </div>
-                            <button class="btn btn-green" onclick="startHiloRound()" style="margin-top:6px;">Start Round</button>
-                        </div>
-                        <div style="font-size:0.6rem;color:var(--text-muted);margin-top:8px;">
-                            Win streak: <span id="hiloStreakDisplay" style="color:var(--brand-green);font-weight:900;">0</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            hiloStreak = 0;
-            hiloCurrentCard = null;
-            hiloBetAmount = 1.0;
-            hiloInProgress = false;
-            generateHiloCard();
-        }
-
-        function generateHiloCard() {
-            const card = Math.floor(Math.random() * 13) + 1;
-            hiloCurrentCard = card;
-            document.getElementById('hiloValue').textContent = `${card} (1-13)`;
-            const suits = ['♠️', '♥️', '♦️', '♣️'];
-            document.getElementById('hiloCard').textContent = `${suits[Math.floor(Math.random() * suits.length)]}${card}`;
-        }
-
-        function startHiloRound() {
-            const bet = parseFloat(document.getElementById('hiloBetInput').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Insufficient balance or invalid bet', 'loss');
-                return;
-            }
-            hiloBetAmount = bet;
-            hiloInProgress = true;
-            document.getElementById('hiloBetDisplay').textContent = bet.toFixed(2);
-            generateHiloCard();
-            triggerToast('🎯 Guess Higher or Lower!', 'gold');
-        }
-
-        function playHilo(choice) {
-            if (!hiloInProgress) {
-                triggerToast('Start a round first!', 'loss');
-                return;
-            }
-
-            const current = hiloCurrentCard;
-            const next = Math.floor(Math.random() * 13) + 1;
-            const bet = hiloBetAmount;
-
-            document.getElementById('hiloCard').textContent = `🃏 → ${['♠️','♥️','♦️','♣️'][Math.floor(Math.random()*4)]}${next}`;
-            document.getElementById('hiloValue').textContent = `${current} → ${next}`;
-
-            let won = false;
-            if (choice === 'higher' && next > current) won = true;
-            if (choice === 'lower' && next < current) won = true;
-
-            if (won) {
-                const win = bet * 1.9;
-                userBalance += win;
-                hiloStreak++;
-                triggerToast(`✅ Correct! +$${win.toFixed(2)} (Streak: ${hiloStreak})`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addBetHistory('Hi-Lo', bet, win, true);
-                addTransaction('game_win', win, 'Hi-Lo win');
-                updateBalance();
-                updateUserWagered(bet);
-                document.getElementById('hiloStreakDisplay').textContent = hiloStreak;
-                hiloInProgress = false;
-                setTimeout(() => {
-                    if (document.getElementById('hiloModal')) {
-                        hiloBetAmount = bet;
-                        document.getElementById('hiloBetDisplay').textContent = bet.toFixed(2);
-                        hiloInProgress = true;
-                        generateHiloCard();
-                        triggerToast('🎯 Next round! Guess again!', 'gold');
-                    }
-                }, 1000);
-            } else {
-                triggerToast(`💔 Wrong! Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Hi-Lo', bet, 0, false);
-                hiloStreak = 0;
-                document.getElementById('hiloStreakDisplay').textContent = '0';
-                hiloInProgress = false;
-            }
+            userBalance -= bet;
+            updateUserWagered(bet);
+            minesBet = bet;
             updateBalance();
+
+            const bombsCount = parseInt(document.getElementById('minesBombs').value);
+            minesState = Array(25).fill('gem');
+            let placed = 0;
+            while (placed < bombsCount) {
+                const r = Math.floor(Math.random() * 25);
+                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
+            }
+
+            safeRevealed = 0;
+            minesActive = true;
+            initMinesGrid();
+
+            document.getElementById('startMinesBtn').style.display = 'none';
+            document.getElementById('cashoutMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
+        }
+
+        function pickMine(idx, el) {
+            if (!minesActive || el.classList.contains('revealed-gem')) return;
+
+            if (minesState[idx] === 'bomb') {
+                el.classList.add('revealed-bomb');
+                el.textContent = '💣';
+                minesActive = false;
+                triggerToast('💥 Hit a mine!', 'loss');
+                playSound('loss');
+                addBetHistory('Mines', minesBet, 0, false);
+                document.getElementById('startMinesBtn').style.display = 'block';
+                document.getElementById('cashoutMinesBtn').style.display = 'none';
+                updateDegenerateStats();
+                saveState();
+            } else {
+                el.classList.add('revealed-gem');
+                el.textContent = '💎';
+                safeRevealed++;
+                const mult = (1 + safeRevealed * 0.2);
+                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
+            }
+        }
+
+        function cashoutMines() {
+            if (!minesActive) return;
+            const mult = (1 + safeRevealed * 0.2);
+            const win = minesBet * mult;
+            userBalance += win;
+            updateBalance();
+            minesActive = false;
+            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
+            playSound('win');
+            fireConfetti(15);
+            addTopMultiplier(currentUser.name, win, mult);
+            addBetHistory('Mines', minesBet, win, true);
+            addTransaction('game_win', win, 'Mines win');
+            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
+            document.getElementById('startMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').style.display = 'none';
             updateDegenerateStats();
             saveState();
         }
 
-        // TOWER
-        function launchTower() {
+        function spinSlots() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const levels = 5 + Math.floor(Math.random() * 3);
-            let level = 1;
-            let multiplier = 1.0;
-
-            function climbTower() {
-                const risk = Math.random();
-                const win = risk > 0.15;
-                if (win) {
-                    multiplier += 0.3;
-                    const winAmt = bet * multiplier;
-                    triggerToast(`🏗️ Level ${level}/${levels}! ${multiplier.toFixed(1)}x (+$${winAmt.toFixed(2)})`, 'win');
-                    playSound('win');
-                    fireConfetti(8);
-                    if (level >= levels) {
-                        userBalance += winAmt;
-                        triggerToast(`🎉 Tower Complete! +$${winAmt.toFixed(2)}!`, 'win');
-                        playSound('jackpot');
-                        fireConfetti(40);
-                        addBetHistory('Tower', bet, winAmt, true);
-                        addTransaction('game_win', winAmt, 'Tower win');
-                        updateBalance();
-                        updateDegenerateStats();
-                        saveState();
-                        return;
-                    }
-                    level++;
-                    if (confirm(`Level ${level-1} won! Continue? (${multiplier.toFixed(1)}x currently)`)) {
-                        climbTower();
-                    } else {
-                        userBalance += bet * multiplier;
-                        triggerToast(`💰 Cashed out +$${(bet * multiplier).toFixed(2)}!`, 'win');
-                        addBetHistory('Tower', bet, bet * multiplier, true);
-                        updateBalance();
-                        updateDegenerateStats();
-                        saveState();
-                    }
-                } else {
-                    triggerToast(`💥 Crashed at level ${level}! Lost $${bet.toFixed(2)}`, 'loss');
-                    playSound('loss');
-                    addBetHistory('Tower', bet, 0, false);
-                    updateDegenerateStats();
-                    saveState();
-                }
-            }
-
-            if (confirm(`Start Tower with $${bet.toFixed(2)}? ${levels} levels to complete.`)) {
-                climbTower();
-            }
-        }
-
-        // KENO
-        function launchKeno() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const picks = [];
-            while (picks.length < 3) {
-                const num = Math.floor(Math.random() * 40) + 1;
-                if (!picks.includes(num)) picks.push(num);
-            }
-
-            const drawn = [];
-            while (drawn.length < 10) {
-                const num = Math.floor(Math.random() * 40) + 1;
-                if (!drawn.includes(num)) drawn.push(num);
-            }
-
-            let matches = picks.filter(p => drawn.includes(p)).length;
-            let multipliers = { 0: 0, 1: 0.5, 2: 2, 3: 5 };
-            const mult = multipliers[matches] || 0;
-
-            if (mult > 0) {
-                const win = bet * mult;
-                userBalance += win;
-                triggerToast(`🎱 Keno! ${matches} matches! +$${win.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(20);
-                addBetHistory('Keno', bet, win, true);
-                addTransaction('game_win', win, 'Keno win');
-                if (matches >= 3) {
-                    addTopMultiplier(currentUser.name, win, mult);
-                }
-            } else {
-                triggerToast(`🎱 No matches. Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Keno', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // COIN FLIP
-        function launchCoinFlip() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const choice = confirm('Choose Heads? (OK=Heads, Cancel=Tails)');
-            const result = Math.random() > 0.5;
-            const win = (choice === result);
-
-            if (win) {
-                const winAmt = bet * 1.96;
-                userBalance += winAmt;
-                triggerToast(`🪙 ${result ? 'Heads' : 'Tails'}! +$${winAmt.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addBetHistory('CoinFlip', bet, winAmt, true);
-                addTransaction('game_win', winAmt, 'Coin Flip win');
-                addTopMultiplier(currentUser.name, winAmt, 1.96);
-            } else {
-                triggerToast(`💔 ${result ? 'Heads' : 'Tails'}! Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('CoinFlip', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // LIMBO
-        function launchLimbo() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const target = parseFloat(prompt('Target multiplier (1.5-10):', '2.0'));
-            if (isNaN(target) || target < 1.5 || target > 10) {
-                triggerToast('Invalid target', 'loss');
-                return;
-            }
-
-            const result = 1.0 + Math.random() * 9;
-            if (result >= target) {
-                const win = bet * target;
-                userBalance += win;
-                triggerToast(`⚡ ${result.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(20);
-                addBetHistory('Limbo', bet, win, true);
-                addTransaction('game_win', win, 'Limbo win');
-                addTopMultiplier(currentUser.name, win, target);
-            } else {
-                triggerToast(`💔 ${result.toFixed(2)}x - Below target! Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Limbo', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // PACHINKO
-        function launchPachinko() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const slots = [0.2, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 8.0];
-            const idx = Math.floor(Math.random() * slots.length);
-            const mult = slots[idx];
-
-            if (mult >= 1) {
-                const win = bet * mult;
-                userBalance += win;
-                triggerToast(`🔮 ${mult}x! +$${win.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(20);
-                addBetHistory('Pachinko', bet, win, true);
-                addTransaction('game_win', win, 'Pachinko win');
-                if (mult >= 3) addTopMultiplier(currentUser.name, win, mult);
-            } else {
-                triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Pachinko', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // ROCK PAPER SCISSORS
-        function launchRPS() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
-                triggerToast('Invalid bet amount', 'loss');
-                return;
-            }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const choices = ['✊', '✋', '✌️'];
-            const playerChoice = prompt('Choose: (0=Rock, 1=Paper, 2=Scissors)');
-            const pIdx = parseInt(playerChoice);
-            if (isNaN(pIdx) || pIdx < 0 || pIdx > 2) {
-                triggerToast('Invalid choice', 'loss');
-                return;
-            }
-
-            const cIdx = Math.floor(Math.random() * 3);
-            let result = '';
-            let win = false;
-
-            if (pIdx === cIdx) result = 'Tie!';
-            else if ((pIdx === 0 && cIdx === 2) || (pIdx === 1 && cIdx === 0) || (pIdx === 2 && cIdx === 1)) {
-                result = 'Win!';
-                win = true;
-            } else {
-                result = 'Lose!';
-            }
-
-            if (win) {
-                const winAmt = bet * 1.95;
-                userBalance += winAmt;
-                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - ${result} +$${winAmt.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addBetHistory('RPS', bet, winAmt, true);
-                addTransaction('game_win', winAmt, 'RPS win');
-            } else if (result === 'Tie!') {
-                userBalance += bet;
-                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - Tie! Bet returned.`, 'gold');
-                addBetHistory('RPS', bet, bet, true);
-            } else {
-                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - ${result} Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('RPS', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // WHEEL
-        function spinWheel() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('wheelBet').value);
+            const bet = parseFloat(document.getElementById('slotsBet').value);
             if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
             if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
 
@@ -5041,89 +4552,156 @@
             updateUserWagered(bet);
             updateBalance();
 
-            const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
-            const weights = [20, 25, 20, 15, 10, 7, 3];
-            let totalWeight = weights.reduce((a, b) => a + b, 0);
-            let rand = Math.random() * totalWeight;
-            let selected = 0;
-            for (let i = 0; i < weights.length; i++) {
-                rand -= weights[i];
-                if (rand <= 0) { selected = i; break; }
-            }
+            const s1 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
+            const s2 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
+            const s3 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
 
-            const mult = multipliers[selected];
-            const win = bet * mult;
-            const wheel = document.getElementById('wheelSpin');
+            document.getElementById('r1').textContent = s1;
+            document.getElementById('r2').textContent = s2;
+            document.getElementById('r3').textContent = s3;
 
-            const spins = 5 + Math.random() * 5;
-            const degrees = spins * 360 + (selected / multipliers.length) * 360;
-            wheel.style.transform = `rotate(${degrees}deg)`;
+            let mult = 0;
+            if (s1 === s2 && s2 === s3) mult = 5.0;
+            else if (s1 === s2 || s2 === s3) mult = 1.5;
 
-            document.getElementById('wheelResult').textContent = '🎡 Spinning...';
-
-            setTimeout(() => {
-                if (mult >= 1) {
-                    userBalance += win;
-                    triggerToast(`🎡 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
-                    playSound('win');
-                    if (mult >= 5) {
-                        fireConfetti(50);
-                        playSound('jackpot');
-                        addTopMultiplier(currentUser.name, win, mult);
-                    } else {
-                        fireConfetti(20);
-                    }
-                    addBetHistory('Wheel', bet, win, true);
-                    addTransaction('game_win', win, 'Wheel win');
-                    recordLiveBet('Wheel', currentUser.name, bet, mult, true);
+            if (mult > 0) {
+                const win = bet * mult;
+                userBalance += win;
+                triggerToast(`🎰 +$${win.toFixed(2)}!`, 'win');
+                playSound('win');
+                if (mult >= 5) {
+                    fireConfetti(50);
+                    playSound('jackpot');
+                    addTopMultiplier(currentUser.name, win, mult);
                 } else {
-                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
-                    playSound('loss');
-                    addBetHistory('Wheel', bet, 0, false);
+                    fireConfetti(15);
                 }
-                updateBalance();
-                document.getElementById('wheelResult').textContent = `🎯 ${mult}x! ${mult >= 1 ? '+$' + win.toFixed(2) : 'Lost $' + bet.toFixed(2)}`;
-                updateDegenerateStats();
-                saveState();
-            }, 4000);
+                addBetHistory('Slots', bet, win, true);
+                addTransaction('game_win', win, 'Slots win');
+                recordLiveBet('Slots', currentUser.name, bet, mult, true);
+            } else {
+                triggerToast(`💔 No win this time`, 'loss');
+                playSound('loss');
+                addBetHistory('Slots', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
         }
 
-        // SEARCH
-        function handleSearch(val) {
-            const resultsContainer = document.getElementById('searchResults');
-            if (!val || val.length < 1) {
-                resultsContainer.style.display = 'none';
-                return;
+        function rollDice() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('diceBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            const roll = (Math.random() * 100).toFixed(2);
+            document.getElementById('diceResultDisplay').textContent = roll;
+
+            const win = parseFloat(roll) < 50;
+            if (win) {
+                const winAmt = bet * 1.98;
+                userBalance += winAmt;
+                triggerToast(`🎲 +$${winAmt.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(15);
+                addTopMultiplier(currentUser.name, winAmt, 1.98);
+                addBetHistory('Dice', bet, winAmt, true);
+                addTransaction('game_win', winAmt, 'Dice win');
+                recordLiveBet('Dice', currentUser.name, bet, 1.98, true);
+            } else {
+                triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Dice', bet, 0, false);
             }
-            const matches = gamesList.filter(g => g.name.toLowerCase().includes(val.toLowerCase()));
-            resultsContainer.style.display = 'flex';
-            resultsContainer.innerHTML = '';
-            if (matches.length === 0) {
-                resultsContainer.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:0.7rem;">No games found</div>';
-                return;
-            }
-            matches.slice(0, 8).forEach(m => {
-                const div = document.createElement('div');
-                div.style.cssText = 'padding:4px 8px;background:rgba(255,255,255,0.02);border-radius:4px;cursor:pointer;font-weight:700;font-size:0.7rem;transition:all 0.2s;';
-                div.textContent = `${m.icon || '🎮'} ${m.name}`;
-                div.onmouseenter = () => { div.style.background = 'rgba(255,255,255,0.05)'; };
-                div.onmouseleave = () => { div.style.background = 'rgba(255,255,255,0.02)'; };
-                div.onclick = () => {
-                    resultsContainer.style.display = 'none';
-                    document.getElementById('searchInput').value = '';
-                    launchGame(m.id);
-                };
-                resultsContainer.appendChild(div);
-            });
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
         }
 
-        document.addEventListener('click', function(e) {
-            const searchInput = document.getElementById('searchInput');
-            const results = document.getElementById('searchResults');
-            if (e.target !== searchInput && !results.contains(e.target)) {
-                results.style.display = 'none';
-            }
-        });
+        // CRASH
+        function resetCrash() {
+            crashActive = false;
+            crashMultiplier = 1.0;
+            crashCashedOut = false;
+            if (crashInterval) { clearInterval(crashInterval); crashInterval = null; }
+            document.getElementById('crashMultiplierDisplay').textContent = '1.00x';
+            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
+            document.getElementById('crashBarFill').style.width = '0%';
+            document.getElementById('crashStatus').textContent = 'Place your bet and watch the multiplier climb!';
+            document.getElementById('crashStartBtn').style.display = 'inline-flex';
+            document.getElementById('crashCashoutBtn').style.display = 'none';
+        }
+
+        function startCrash() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            if (crashActive) { triggerToast('Game already running!', 'gold'); return; }
+
+            const bet = parseFloat(document.getElementById('crashBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            crashBetAmount = bet;
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            crashActive = true;
+            crashMultiplier = 1.0;
+            crashCashedOut = false;
+            document.getElementById('crashStartBtn').style.display = 'none';
+            document.getElementById('crashCashoutBtn').style.display = 'inline-flex';
+            document.getElementById('crashStatus').textContent = '🚀 Flying...';
+            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
+
+            const crashPoint = 1.0 + Math.random() * 14;
+
+            crashInterval = setInterval(() => {
+                crashMultiplier += 0.01;
+                const displayMult = crashMultiplier.toFixed(2);
+                document.getElementById('crashMultiplierDisplay').textContent = displayMult + 'x';
+                document.getElementById('crashBarFill').style.width = Math.min((crashMultiplier / 15) * 100, 100) + '%';
+
+                if (crashMultiplier >= crashPoint) {
+                    clearInterval(crashInterval);
+                    crashInterval = null;
+                    crashActive = false;
+                    document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display crashed';
+                    document.getElementById('crashStatus').textContent = `💥 Crashed at ${crashMultiplier.toFixed(2)}x!`;
+                    document.getElementById('crashStartBtn').style.display = 'inline-flex';
+                    document.getElementById('crashCashoutBtn').style.display = 'none';
+
+                    if (!crashCashedOut) {
+                        triggerToast(`💥 Crashed at ${crashMultiplier.toFixed(2)}x! Lost $${crashBetAmount.toFixed(2)}`, 'loss');
+                        playSound('loss');
+                        addBetHistory('Crash', crashBetAmount, 0, false);
+                    }
+                    updateDegenerateStats();
+                    saveState();
+                }
+            }, 50);
+        }
+
+        function cashoutCrash() {
+            if (!crashActive || crashCashedOut) return;
+            crashCashedOut = true;
+            const win = crashBetAmount * crashMultiplier;
+            userBalance += win;
+            updateBalance();
+            triggerToast(`💎 Cashed out at ${crashMultiplier.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
+            playSound('win');
+            fireConfetti(30);
+            addTopMultiplier(currentUser.name, win, crashMultiplier);
+            addBetHistory('Crash', crashBetAmount, win, true);
+            addTransaction('game_win', win, 'Crash win');
+            recordLiveBet('Crash', currentUser.name, crashBetAmount, crashMultiplier, true);
+            document.getElementById('crashCashoutBtn').style.display = 'none';
+            document.getElementById('crashStatus').textContent = `✅ Cashed out at ${crashMultiplier.toFixed(2)}x!`;
+            updateDegenerateStats();
+            saveState();
+        }
 
         // ======================================================
         // INIT
@@ -5141,7 +4719,7 @@
         setTimeout(scheduleTopMultipliers, 10000);
         setTimeout(scheduleLiveWins, 12000);
 
-        console.log('🔥 BETVORA loaded with API backend!');
+        console.log('🔥 BETVORA loaded with API backend and Betnex games!');
         console.log('📡 API URL:', API_URL);
         console.log('👤 User:', currentUser.isLoggedIn ? currentUser.name : 'Guest');
     </script>
