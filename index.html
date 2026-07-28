@@ -2629,7 +2629,7 @@
             <p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;">Create your account & start winning.</p>
             <input type="text" id="regUsername" placeholder="Username" style="width:100%;margin-bottom:6px;font-size:0.75rem;">
             <input type="email" id="authEmail" placeholder="Email" style="width:100%;margin-bottom:6px;font-size:0.75rem;">
-            <input type="password" id="authPass" placeholder="Password" style="width:100%;margin-bottom:10px;font-size:0.75rem;">
+            <input type="password" id="authPass" placeholder="Password (min 6 chars)" style="width:100%;margin-bottom:10px;font-size:0.75rem;">
             <button class="btn btn-green" id="authActionBtn" style="width:100%;justify-content:center;padding:8px;font-size:0.75rem;" onclick="registerEmailAccount()">Create Account</button>
             <button class="btn" style="width:100%;justify-content:center;margin-top:8px;padding:6px;font-size:0.7rem;" onclick="closeModal('authModal')">Cancel</button>
         </div>
@@ -2762,8 +2762,421 @@
 
     <script>
         // ======================================================
-        // 1. NAME ARRAYS
+        // 1. API CONFIGURATION
         // ======================================================
+        const API_URL = 'http://localhost:5000/api';
+        let authToken = localStorage.getItem('authToken');
+
+        // ======================================================
+        // 2. API HELPER
+        // ======================================================
+        async function apiCall(endpoint, options = {}) {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+                    ...options.headers
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'API call failed');
+            }
+            return data;
+        }
+
+        // ======================================================
+        // 3. AUTH FUNCTIONS - REPLACING localStorage ones
+        // ======================================================
+
+        // REGISTER - New version using API
+        function registerEmailAccount() {
+            const username = document.getElementById('regUsername').value.trim();
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPass').value.trim();
+
+            if (!username || username.length < 3) {
+                triggerToast('Username must be at least 3 characters', 'loss');
+                return;
+            }
+            if (!email) { triggerToast('Please enter an email', 'loss'); return; }
+            if (!password || password.length < 6) {
+                triggerToast('Password must be at least 6 characters', 'loss');
+                return;
+            }
+
+            showLoading(true);
+            apiCall('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({ username, email, password })
+            })
+            .then(data => {
+                authToken = data.token;
+                localStorage.setItem('authToken', authToken);
+                currentUser.isLoggedIn = true;
+                currentUser.name = data.user.username;
+                userBalance = data.user.balance;
+                triggerToast(`Welcome ${data.user.username}! 🎉`, 'win');
+                closeModal('authModal');
+                updateUI();
+                saveState();
+                showLoading(false);
+                fireConfetti(20);
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast(err.message, 'loss');
+            });
+        }
+
+        // LOGIN - New version using API
+        function loginAccount() {
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPass').value.trim();
+
+            if (!email) { triggerToast('Please enter your email', 'loss'); return; }
+            if (!password) { triggerToast('Please enter your password', 'loss'); return; }
+
+            showLoading(true);
+            apiCall('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password })
+            })
+            .then(data => {
+                authToken = data.token;
+                localStorage.setItem('authToken', authToken);
+                currentUser.isLoggedIn = true;
+                currentUser.name = data.user.username;
+                userBalance = data.user.balance;
+                triggerToast(`Welcome back, ${data.user.username}! 🔄`, 'win');
+                closeModal('authModal');
+                updateUI();
+                saveState();
+                showLoading(false);
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast(err.message, 'loss');
+            });
+        }
+
+        // LOGOUT - New version
+        function handleLogout() {
+            if (!currentUser.isLoggedIn) {
+                triggerToast('Already logged out', 'gold');
+                closeModal('accountModal');
+                return;
+            }
+
+            authToken = null;
+            localStorage.removeItem('authToken');
+            currentUser.isLoggedIn = false;
+            currentUser.name = 'Guest';
+            userBalance = 0;
+
+            updateUI();
+            triggerToast('🔓 Logged out successfully', 'gold');
+            closeModal('accountModal');
+            saveState();
+        }
+
+        // ======================================================
+        // 4. GAME FUNCTIONS - REPLACING localStorage ones
+        // ======================================================
+
+        // PLINKO
+        function dropPlinko() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('plinkoBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            document.getElementById('plinkoDropVisual').textContent = '🟡';
+            document.getElementById('plinkoStatusText').textContent = 'Dropping...';
+
+            showLoading(true);
+            apiCall('/games/plinko', {
+                method: 'POST',
+                body: JSON.stringify({ bet })
+            })
+            .then(data => {
+                userBalance = data.newBalance;
+                updateBalance();
+                if (data.result.isWin) {
+                    triggerToast(`🎯 ${data.result.multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
+                    playSound('win');
+                    fireConfetti(20);
+                    addTopMultiplier(currentUser.name, data.result.winAmount, data.result.multiplier);
+                    addBetHistory('Plinko', bet, data.result.winAmount, true);
+                    addTransaction('game_win', data.result.winAmount, 'Plinko win');
+                    recordLiveBet('Plinko', currentUser.name, bet, data.result.multiplier, true);
+                } else {
+                    triggerToast(`💔 ${data.result.multiplier}x - Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Plinko', bet, 0, false);
+                }
+                document.getElementById('plinkoStatusText').textContent = `Landed on ${data.result.multiplier}x!`;
+                document.getElementById('plinkoDropVisual').textContent = '⚪';
+                updateDegenerateStats();
+                saveState();
+                showLoading(false);
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast(err.message, 'loss');
+                document.getElementById('plinkoStatusText').textContent = 'Error! Try again.';
+                document.getElementById('plinkoDropVisual').textContent = '⚪';
+            });
+        }
+
+        // MINES
+        function startMines() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('minesBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            minesBet = bet;
+            updateBalance();
+
+            const bombsCount = parseInt(document.getElementById('minesBombs').value);
+            minesState = Array(25).fill('gem');
+            let placed = 0;
+            while (placed < bombsCount) {
+                const r = Math.floor(Math.random() * 25);
+                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
+            }
+
+            safeRevealed = 0;
+            minesActive = true;
+            initMinesGrid();
+
+            document.getElementById('startMinesBtn').style.display = 'none';
+            document.getElementById('cashoutMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
+        }
+
+        function pickMine(idx, el) {
+            if (!minesActive || el.classList.contains('revealed-gem')) return;
+
+            if (minesState[idx] === 'bomb') {
+                el.classList.add('revealed-bomb');
+                el.textContent = '💣';
+                minesActive = false;
+                triggerToast('💥 Hit a mine!', 'loss');
+                playSound('loss');
+                addBetHistory('Mines', minesBet, 0, false);
+                document.getElementById('startMinesBtn').style.display = 'block';
+                document.getElementById('cashoutMinesBtn').style.display = 'none';
+                updateDegenerateStats();
+                saveState();
+            } else {
+                el.classList.add('revealed-gem');
+                el.textContent = '💎';
+                safeRevealed++;
+                const mult = (1 + safeRevealed * 0.2);
+                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
+            }
+        }
+
+        function cashoutMines() {
+            if (!minesActive) return;
+            const mult = (1 + safeRevealed * 0.2);
+            const win = minesBet * mult;
+            userBalance += win;
+            updateBalance();
+            minesActive = false;
+            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
+            playSound('win');
+            fireConfetti(15);
+            addTopMultiplier(currentUser.name, win, mult);
+            addBetHistory('Mines', minesBet, win, true);
+            addTransaction('game_win', win, 'Mines win');
+            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
+            document.getElementById('startMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').style.display = 'none';
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // SLOTS
+        function spinSlots() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('slotsBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const s1 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
+            const s2 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
+            const s3 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
+
+            document.getElementById('r1').textContent = s1;
+            document.getElementById('r2').textContent = s2;
+            document.getElementById('r3').textContent = s3;
+
+            let mult = 0;
+            if (s1 === s2 && s2 === s3) mult = 5.0;
+            else if (s1 === s2 || s2 === s3) mult = 1.5;
+
+            if (mult > 0) {
+                const win = bet * mult;
+                userBalance += win;
+                triggerToast(`🎰 +$${win.toFixed(2)}!`, 'win');
+                playSound('win');
+                if (mult >= 5) {
+                    fireConfetti(50);
+                    playSound('jackpot');
+                    addTopMultiplier(currentUser.name, win, mult);
+                } else {
+                    fireConfetti(15);
+                }
+                addBetHistory('Slots', bet, win, true);
+                addTransaction('game_win', win, 'Slots win');
+                recordLiveBet('Slots', currentUser.name, bet, mult, true);
+            } else {
+                triggerToast(`💔 No win this time`, 'loss');
+                playSound('loss');
+                addBetHistory('Slots', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // DICE
+        function rollDice() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('diceBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            const roll = (Math.random() * 100).toFixed(2);
+            document.getElementById('diceResultDisplay').textContent = roll;
+
+            const win = parseFloat(roll) < 50;
+            if (win) {
+                const winAmt = bet * 1.98;
+                userBalance += winAmt;
+                triggerToast(`🎲 +$${winAmt.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(15);
+                addTopMultiplier(currentUser.name, winAmt, 1.98);
+                addBetHistory('Dice', bet, winAmt, true);
+                addTransaction('game_win', winAmt, 'Dice win');
+                recordLiveBet('Dice', currentUser.name, bet, 1.98, true);
+            } else {
+                triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Dice', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // CRASH
+        let crashActive = false;
+        let crashMultiplier = 1.0;
+        let crashInterval = null;
+        let crashBetAmount = 0;
+        let crashCashedOut = false;
+
+        function resetCrash() {
+            crashActive = false;
+            crashMultiplier = 1.0;
+            crashCashedOut = false;
+            if (crashInterval) { clearInterval(crashInterval); crashInterval = null; }
+            document.getElementById('crashMultiplierDisplay').textContent = '1.00x';
+            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
+            document.getElementById('crashBarFill').style.width = '0%';
+            document.getElementById('crashStatus').textContent = 'Place your bet and watch the multiplier climb!';
+            document.getElementById('crashStartBtn').style.display = 'inline-flex';
+            document.getElementById('crashCashoutBtn').style.display = 'none';
+        }
+
+        function startCrash() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            if (crashActive) { triggerToast('Game already running!', 'gold'); return; }
+
+            const bet = parseFloat(document.getElementById('crashBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            crashBetAmount = bet;
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            crashActive = true;
+            crashMultiplier = 1.0;
+            crashCashedOut = false;
+            document.getElementById('crashStartBtn').style.display = 'none';
+            document.getElementById('crashCashoutBtn').style.display = 'inline-flex';
+            document.getElementById('crashStatus').textContent = '🚀 Flying...';
+            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
+
+            const crashPoint = 1.0 + Math.random() * 14;
+
+            crashInterval = setInterval(() => {
+                crashMultiplier += 0.01;
+                const displayMult = crashMultiplier.toFixed(2);
+                document.getElementById('crashMultiplierDisplay').textContent = displayMult + 'x';
+                document.getElementById('crashBarFill').style.width = Math.min((crashMultiplier / 15) * 100, 100) + '%';
+
+                if (crashMultiplier >= crashPoint) {
+                    clearInterval(crashInterval);
+                    crashInterval = null;
+                    crashActive = false;
+                    document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display crashed';
+                    document.getElementById('crashStatus').textContent = `💥 Crashed at ${crashMultiplier.toFixed(2)}x!`;
+                    document.getElementById('crashStartBtn').style.display = 'inline-flex';
+                    document.getElementById('crashCashoutBtn').style.display = 'none';
+
+                    if (!crashCashedOut) {
+                        triggerToast(`💥 Crashed at ${crashMultiplier.toFixed(2)}x! Lost $${crashBetAmount.toFixed(2)}`, 'loss');
+                        playSound('loss');
+                        addBetHistory('Crash', crashBetAmount, 0, false);
+                    }
+                    updateDegenerateStats();
+                    saveState();
+                }
+            }, 50);
+        }
+
+        function cashoutCrash() {
+            if (!crashActive || crashCashedOut) return;
+            crashCashedOut = true;
+            const win = crashBetAmount * crashMultiplier;
+            userBalance += win;
+            updateBalance();
+            triggerToast(`💎 Cashed out at ${crashMultiplier.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
+            playSound('win');
+            fireConfetti(30);
+            addTopMultiplier(currentUser.name, win, crashMultiplier);
+            addBetHistory('Crash', crashBetAmount, win, true);
+            addTransaction('game_win', win, 'Crash win');
+            recordLiveBet('Crash', currentUser.name, crashBetAmount, crashMultiplier, true);
+            document.getElementById('crashCashoutBtn').style.display = 'none';
+            document.getElementById('crashStatus').textContent = `✅ Cashed out at ${crashMultiplier.toFixed(2)}x!`;
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // ======================================================
+        // 5. ALL ORIGINAL FUNCTIONS BELOW (Keep them as they are)
+        // ======================================================
+
+        // NAME ARRAYS
         const leaderboardNames = [
             'HighRoller', 'LuckyStrike', 'AceHigh', 'RoyalFlush', 'BlackJackKing',
             'RouletteQueen', 'CrapsMaster', 'BaccaratBoss', 'PokerPro', 'CasinoRoyale',
@@ -2789,9 +3202,7 @@
             'NeonNinja', 'CyberSamurai', 'DigitalGhost', 'QuantumLeap', 'StellarVoyager'
         ];
 
-        // ======================================================
-        // 2. BONUS TIERS
-        // ======================================================
+        // BONUS TIERS
         const BONUS_TIERS = [
             { id: 1, wager: 100, reward: 10, label: 'Tier 1', icon: '🥉' },
             { id: 2, wager: 500, reward: 50, label: 'Tier 2', icon: '🥈' },
@@ -2800,9 +3211,6 @@
             { id: 5, wager: 10000, reward: 980, label: 'Tier 5', icon: '🔥' }
         ];
 
-        // ======================================================
-        // 3. UTILITY FUNCTIONS
-        // ======================================================
         let usedLeaderboardNames = [];
         let usedMultiplierNames = [];
         let usedLiveNames = [];
@@ -2827,9 +3235,7 @@
             }
         }
 
-        // ======================================================
-        // 4. CLOCK
-        // ======================================================
+        // CLOCK
         function updateClock() {
             const now = new Date();
             document.getElementById('headerTime').textContent =
@@ -2838,9 +3244,7 @@
         setInterval(updateClock, 10000);
         updateClock();
 
-        // ======================================================
-        // 5. PARTICLES
-        // ======================================================
+        // PARTICLES
         (function initParticles() {
             const canvas = document.getElementById('particles-canvas');
             const ctx = canvas.getContext('2d');
@@ -2882,16 +3286,13 @@
 
             function animate() {
                 ctx.clearRect(0, 0, w, h);
-                particles.forEach(p => { p.update();
-                    p.draw(); });
+                particles.forEach(p => { p.update(); p.draw(); });
                 requestAnimationFrame(animate);
             }
             animate();
         })();
 
-        // ======================================================
-        // 6. CONFETTI
-        // ======================================================
+        // CONFETTI
         function fireConfetti(count = 60) {
             const container = document.getElementById('confettiContainer');
             const colors = ['#ffd700', '#00e699', '#ff3cac', '#0075ff', '#ff6b6b', '#ffd93d', '#6bcb77'];
@@ -2911,9 +3312,7 @@
             }
         }
 
-        // ======================================================
-        // 7. SOUND
-        // ======================================================
+        // SOUND
         function playSound(type) {
             try {
                 const ctx = new(window.AudioContext || window.webkitAudioContext)();
@@ -2959,9 +3358,7 @@
             } catch (e) { /* silent */ }
         }
 
-        // ======================================================
-        // 8. APP STATE
-        // ======================================================
+        // APP STATE
         let userBalance = 0.00;
         let currentUser = {
             name: 'Guest',
@@ -3000,26 +3397,17 @@
         let walletConnected = false;
         let walletAddress = '';
 
-        // ======================================================
-        // 9. WALLET ADDRESSES
-        // ======================================================
+        // WALLET ADDRESSES
         const WALLETS = {
-            BTC: { label: 'Bitcoin (BTC)', address: 'bc1q5gnwwhafjhygkhvfzqdc3slput2vmtw9c0ltcy',
-            note: 'Send only BTC to this address.' },
-            ETH: { label: 'Ethereum (ETH)', address: '0x54Cc6d9EdE0cb522FaC0F589F9e878075992d4B6',
-                note: 'Send only ETH on mainnet.' },
-            USDC: { label: 'USDC (ERC-20)', address: '0x54Cc6d9EdE0cb522FaC0F589F9e878075992d4B6',
-                note: 'Send only USDC on Ethereum network.' },
-            SOL: { label: 'Solana (SOL)', address: 'J5NYumyZFods5vns2Q654rGbHMyLGw8gd9X5CuZ6VCvh',
-                note: 'Send only SOL on Solana network.' },
-            LTC: { label: 'Litecoin (LTC)', address: 'LbRbfqboUgHCy44oY1wp9qAasC7549G3eZ',
-            note: 'Send only LTC to this address.' }
+            BTC: { label: 'Bitcoin (BTC)', address: 'bc1q5gnwwhafjhygkhvfzqdc3slput2vmtw9c0ltcy', note: 'Send only BTC to this address.' },
+            ETH: { label: 'Ethereum (ETH)', address: '0x54Cc6d9EdE0cb522FaC0F589F9e878075992d4B6', note: 'Send only ETH on mainnet.' },
+            USDC: { label: 'USDC (ERC-20)', address: '0x54Cc6d9EdE0cb522FaC0F589F9e878075992d4B6', note: 'Send only USDC on Ethereum network.' },
+            SOL: { label: 'Solana (SOL)', address: 'J5NYumyZFods5vns2Q654rGbHMyLGw8gd9X5CuZ6VCvh', note: 'Send only SOL on Solana network.' },
+            LTC: { label: 'Litecoin (LTC)', address: 'LbRbfqboUgHCy44oY1wp9qAasC7549G3eZ', note: 'Send only LTC to this address.' }
         };
         let activeCoin = 'BTC';
 
-        // ======================================================
-        // 10. LOAD / SAVE STATE
-        // ======================================================
+        // LOAD / SAVE STATE
         function loadState() {
             try {
                 const usersSaved = localStorage.getItem('betvora_all_users');
@@ -3102,9 +3490,7 @@
             } catch (e) { /* ignore */ }
         }
 
-        // ======================================================
-        // 11. UNIQUENESS CHECKS
-        // ======================================================
+        // UNIQUENESS CHECKS
         function isUsernameTaken(username) {
             if (!username) return false;
             return allUsernames.some(u => u.toLowerCase() === username.toLowerCase());
@@ -3152,9 +3538,7 @@
             return true;
         }
 
-        // ======================================================
-        // 12. BONUS SYSTEM
-        // ======================================================
+        // BONUS SYSTEM
         function getCurrentTier() {
             const idx = currentUser.currentBonusTier;
             if (idx >= BONUS_TIERS.length) return null;
@@ -3305,8 +3689,7 @@
                 const isActive = index === currentUser.currentBonusTier;
                 const isLocked = index > currentUser.currentBonusTier;
 
-                const progress = isCompleted ? 100 : isActive ? Math.min((currentUser.bonusProgress / tier.wager) *
-                    100, 100) : 0;
+                const progress = isCompleted ? 100 : isActive ? Math.min((currentUser.bonusProgress / tier.wager) * 100, 100) : 0;
                 const isReady = isActive && currentUser.bonusProgress >= tier.wager;
 
                 let statusClass = 'locked';
@@ -3330,38 +3713,36 @@
                 card.className = `bonus-tier-card ${statusClass}`;
 
                 card.innerHTML = `
-                        <div class="tier-left">
-                            <div class="tier-icon">${tier.icon}</div>
-                            <div class="tier-info">
-                                <div class="tier-name" style="color:${statusColor};">${tier.label}</div>
-                                <div class="tier-desc">Wager $${tier.wager} → Get $${tier.reward}</div>
-                            </div>
+                    <div class="tier-left">
+                        <div class="tier-icon">${tier.icon}</div>
+                        <div class="tier-info">
+                            <div class="tier-name" style="color:${statusColor};">${tier.label}</div>
+                            <div class="tier-desc">Wager $${tier.wager} → Get $${tier.reward}</div>
                         </div>
-                        <div class="tier-progress">
-                            <div class="progress-track">
-                                <div class="progress-fill" style="width:${progress}%;background:${progressColor};"></div>
-                            </div>
-                            <div class="progress-label">${isCompleted ? '100%' : Math.round(progress) + '%'}</div>
+                    </div>
+                    <div class="tier-progress">
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width:${progress}%;background:${progressColor};"></div>
                         </div>
-                        <div class="tier-reward ${isCompleted ? 'completed' : ''}">
-                            ${isCompleted ? '+$' + tier.reward : '$' + tier.reward}
-                        </div>
-                        <div class="tier-action">
-                            ${isReady ? 
-                                `<button class="claim-btn-small" onclick="claimBonus()">Claim</button>` :
-                                `<span class="status-text ${statusClass}">${statusText}</span>`
-                            }
-                        </div>
-                    `;
+                        <div class="progress-label">${isCompleted ? '100%' : Math.round(progress) + '%'}</div>
+                    </div>
+                    <div class="tier-reward ${isCompleted ? 'completed' : ''}">
+                        ${isCompleted ? '+$' + tier.reward : '$' + tier.reward}
+                    </div>
+                    <div class="tier-action">
+                        ${isReady ? 
+                            `<button class="claim-btn-small" onclick="claimBonus()">Claim</button>` :
+                            `<span class="status-text ${statusClass}">${statusText}</span>`
+                        }
+                    </div>
+                `;
                 container.appendChild(card);
             });
 
             openModal('bonusModal');
         }
 
-        // ======================================================
-        // 13. UPDATE USER WAGERED & DEGENERATE STATS
-        // ======================================================
+        // UPDATE USER WAGERED & DEGENERATE STATS
         function updateUserWagered(amount) {
             if (!currentUser.isLoggedIn) return;
             currentUser.totalWagered = (currentUser.totalWagered || 0) + amount;
@@ -3441,15 +3822,10 @@
             let rankIcon = '🥉';
             let rankColor = '#cd7f32';
 
-            if (wagered >= 25000) { rank = 'platinum';
-                rankIcon = '💎';
-                rankColor = '#e5e4e2'; } else if (wagered >= 5000) { rank = 'gold';
-                rankIcon = '🥇';
-                rankColor = '#ffd700'; } else if (wagered >= 1000) { rank = 'silver';
-                rankIcon = '🥈';
-                rankColor = '#c0c0c0'; } else { rank = 'bronze';
-                rankIcon = '🥉';
-                rankColor = '#cd7f32'; }
+            if (wagered >= 25000) { rank = 'platinum'; rankIcon = '💎'; rankColor = '#e5e4e2'; }
+            else if (wagered >= 5000) { rank = 'gold'; rankIcon = '🥇'; rankColor = '#ffd700'; }
+            else if (wagered >= 1000) { rank = 'silver'; rankIcon = '🥈'; rankColor = '#c0c0c0'; }
+            else { rank = 'bronze'; rankIcon = '🥉'; rankColor = '#cd7f32'; }
 
             currentUser.degenRank = rank;
             const rankLabel = getDegenRankLabel(rank);
@@ -3470,9 +3846,6 @@
             updateDegenRanks();
         }
 
-        // ======================================================
-        // 14. DEGEN RANKS
-        // ======================================================
         function updateDegenRanks() {
             const wagered = currentUser.totalWagered || 0;
             let rank = 'bronze';
@@ -3482,27 +3855,10 @@
             let nextProgress = 0;
             let nextRequirement = 100;
 
-            if (wagered >= 25000) { rank = 'platinum';
-                label = 'Platinum Degen';
-                icon = '💎';
-                color = '#e5e4e2';
-                nextProgress = 100;
-                nextRequirement = 25000; } else if (wagered >= 5000) { rank = 'gold';
-                label = 'Gold Degen';
-                icon = '🥇';
-                color = '#ffd700';
-                nextProgress = ((wagered - 5000) / 20000) * 100;
-                nextRequirement = 5000; } else if (wagered >= 1000) { rank = 'silver';
-                label = 'Silver Degen';
-                icon = '🥈';
-                color = '#c0c0c0';
-                nextProgress = ((wagered - 1000) / 4000) * 100;
-                nextRequirement = 1000; } else { rank = 'bronze';
-                label = 'Bronze Degen';
-                icon = '🥉';
-                color = '#cd7f32';
-                nextProgress = (wagered / 100) * 100;
-                nextRequirement = 100; }
+            if (wagered >= 25000) { rank = 'platinum'; label = 'Platinum Degen'; icon = '💎'; color = '#e5e4e2'; nextProgress = 100; nextRequirement = 25000; }
+            else if (wagered >= 5000) { rank = 'gold'; label = 'Gold Degen'; icon = '🥇'; color = '#ffd700'; nextProgress = ((wagered - 5000) / 20000) * 100; nextRequirement = 5000; }
+            else if (wagered >= 1000) { rank = 'silver'; label = 'Silver Degen'; icon = '🥈'; color = '#c0c0c0'; nextProgress = ((wagered - 1000) / 4000) * 100; nextRequirement = 1000; }
+            else { rank = 'bronze'; label = 'Bronze Degen'; icon = '🥉'; color = '#cd7f32'; nextProgress = (wagered / 100) * 100; nextRequirement = 100; }
 
             currentUser.degenRank = rank;
 
@@ -3536,9 +3892,7 @@
             openModal('degenRanksModal');
         }
 
-        // ======================================================
-        // 15. TOAST SYSTEM
-        // ======================================================
+        // TOAST SYSTEM
         function triggerToast(msg, type = 'green') {
             const box = document.getElementById('toastBox');
             const toast = document.createElement('div');
@@ -3552,9 +3906,7 @@
             }, 3500);
         }
 
-        // ======================================================
-        // 16. UI UPDATES
-        // ======================================================
+        // UI UPDATES
         function updateBalance() {
             const formatted = `$${userBalance.toFixed(2)}`;
             document.getElementById('userBalance').textContent = formatted;
@@ -3595,9 +3947,7 @@
             document.getElementById('loadingOverlay').classList.toggle('active', show);
         }
 
-        // ======================================================
-        // 17. BET HISTORY
-        // ======================================================
+        // BET HISTORY
         function addBetHistory(game, bet, win, isWin) {
             currentUser.betHistory.unshift({
                 game: game,
@@ -3636,9 +3986,9 @@
             }
             container.innerHTML = currentUser.betHistory.slice(0, 10).map(b =>
                 `<div style="display:flex;justify-content:space-between;font-size:0.65rem;padding:2px 0;border-bottom:1px solid var(--border);">
-                        <span>${b.game}</span>
-                        <span style="color:${b.isWin ? 'var(--brand-green)' : 'var(--brand-red)'};">${b.isWin ? '+$' : '-$'}${b.win.toFixed(2)}</span>
-                    </div>`
+                    <span>${b.game}</span>
+                    <span style="color:${b.isWin ? 'var(--brand-green)' : 'var(--brand-red)'};">${b.isWin ? '+$' : '-$'}${b.win.toFixed(2)}</span>
+                </div>`
             ).join('');
         }
 
@@ -3646,19 +3996,15 @@
             const container = document.getElementById('recentBetsSidebar');
             if (!container) return;
             const entry = document.createElement('div');
-            entry.style.cssText =
-                'padding:2px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:0.55rem;';
-            entry.innerHTML =
-                `<span>${game}</span><span style="color:${isWin ? 'var(--brand-green)' : 'var(--brand-red)'};">${isWin ? '+$' : '-$'}${win.toFixed(2)}</span>`;
+            entry.style.cssText = 'padding:2px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:0.55rem;';
+            entry.innerHTML = `<span>${game}</span><span style="color:${isWin ? 'var(--brand-green)' : 'var(--brand-red)'};">${isWin ? '+$' : '-$'}${win.toFixed(2)}</span>`;
             container.insertBefore(entry, container.firstChild);
             while (container.children.length > 10) {
                 container.removeChild(container.lastChild);
             }
         }
 
-        // ======================================================
-        // 18. TRANSACTION HISTORY
-        // ======================================================
+        // TRANSACTION HISTORY
         function addTransaction(type, amount, details = '') {
             currentUser.transactions.unshift({
                 type: type,
@@ -3680,15 +4026,13 @@
             }
             container.innerHTML = currentUser.transactions.slice(0, 8).map(t =>
                 `<div style="display:flex;justify-content:space-between;font-size:0.65rem;padding:2px 0;border-bottom:1px solid var(--border);">
-                        <span>${t.type.replace('_', ' ').toUpperCase()}</span>
-                        <span style="color:${t.amount >= 0 ? 'var(--brand-green)' : 'var(--brand-red)'};">${t.amount >= 0 ? '+$' : '-$'}${Math.abs(t.amount).toFixed(2)}</span>
-                    </div>`
+                    <span>${t.type.replace('_', ' ').toUpperCase()}</span>
+                    <span style="color:${t.amount >= 0 ? 'var(--brand-green)' : 'var(--brand-red)'};">${t.amount >= 0 ? '+$' : '-$'}${Math.abs(t.amount).toFixed(2)}</span>
+                </div>`
             ).join('');
         }
 
-        // ======================================================
-        // 19. WALLET CONNECT
-        // ======================================================
+        // WALLET CONNECT
         async function connectWallet() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
@@ -3696,8 +4040,7 @@
                     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     walletAddress = accounts[0];
                     walletConnected = true;
-                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(
-                        -4);
+                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
                     document.getElementById('walletConnectBtn').classList.add('connected');
                     triggerToast('🔗 Wallet connected!', 'win');
                     showLoading(false);
@@ -3718,8 +4061,7 @@
                     const resp = await window.solana.connect();
                     walletAddress = resp.publicKey.toString();
                     walletConnected = true;
-                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(
-                        -4);
+                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
                     document.getElementById('walletConnectBtn').classList.add('connected');
                     triggerToast('🔗 Phantom connected!', 'win');
                     showLoading(false);
@@ -3743,122 +4085,13 @@
                     triggerToast('Wallet disconnected', 'loss');
                 } else {
                     walletAddress = accounts[0];
-                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(
-                        -4);
+                    document.getElementById('walletStatus').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
                     triggerToast('Wallet account changed', 'gold');
                 }
             });
         }
 
-        // ======================================================
-        // 20. AUTH SYSTEM
-        // ======================================================
-        function registerEmailAccount() {
-            const name = document.getElementById('regUsername').value.trim() || 'Player';
-            const email = document.getElementById('authEmail').value.trim();
-            const password = document.getElementById('authPass').value.trim();
-
-            if (!email) { triggerToast('Please enter an email', 'loss'); return; }
-            if (!password || password.length < 4) { triggerToast('Password must be at least 4 characters', 'loss'); return; }
-
-            if (isEmailRegistered(email)) {
-                const user = findUserByEmail(email);
-                if (user && user.password === password) {
-                    currentUser.name = user.username;
-                    currentUser.isLoggedIn = true;
-                    currentUser.level = 'Starter';
-                    currentUser.email = email;
-                    currentUser.password = password;
-                    userBalance = 0;
-                    triggerToast(`Welcome back, ${currentUser.name}! 🔄`, 'win');
-                    closeModal('authModal');
-                    updateUI();
-                    saveState();
-                    return;
-                } else {
-                    triggerToast('❌ Email registered but password incorrect. Please try again.', 'loss');
-                    return;
-                }
-            }
-
-            if (isUsernameTaken(name)) {
-                triggerToast('❌ Username "' + name + '" is already taken!', 'loss');
-                return;
-            }
-
-            if (!registerUsername(name, email, password)) {
-                triggerToast('Failed to register', 'loss');
-                return;
-            }
-
-            currentUser.name = name;
-            currentUser.isLoggedIn = true;
-            currentUser.level = 'Starter';
-            currentUser.email = email;
-            currentUser.password = password;
-            userBalance = 0;
-
-            triggerToast(`Welcome ${name}! 🎲 Start playing to earn rewards!`, 'win');
-            closeModal('authModal');
-            updateUI();
-            saveState();
-            fireConfetti(20);
-        }
-
-        function loginAccount() {
-            const email = document.getElementById('authEmail').value.trim();
-            const password = document.getElementById('authPass').value.trim();
-
-            if (!email) { triggerToast('Please enter your email', 'loss'); return; }
-            if (!password) { triggerToast('Please enter your password', 'loss'); return; }
-
-            const user = findUserByEmail(email);
-            if (!user) {
-                triggerToast('❌ No account found with this email', 'loss');
-                return;
-            }
-
-            if (user.password !== password) {
-                triggerToast('❌ Incorrect password', 'loss');
-                return;
-            }
-
-            currentUser.name = user.username;
-            currentUser.isLoggedIn = true;
-            currentUser.level = 'Starter';
-            currentUser.email = email;
-            currentUser.password = password;
-            userBalance = 0;
-
-            triggerToast(`Welcome back, ${currentUser.name}! 🔄`, 'win');
-            closeModal('authModal');
-            updateUI();
-            saveState();
-        }
-
-        function handleLogout() {
-            if (!currentUser.isLoggedIn) {
-                triggerToast('Already logged out', 'gold');
-                closeModal('accountModal');
-                return;
-            }
-
-            currentUser.isLoggedIn = false;
-            currentUser.name = 'Guest';
-            currentUser.level = 'Starter';
-            currentUser.email = '';
-            currentUser.password = '';
-            userBalance = 0;
-
-            updateUI();
-            triggerToast('🔓 Logged out successfully', 'gold');
-            closeModal('accountModal');
-            saveState();
-        }
-
-        // ======================================================
-        // 21. USERNAME CHANGE
-        // ======================================================
+        // USERNAME CHANGE
         function saveNewUsername() {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Please login first', 'loss');
@@ -3893,11 +4126,8 @@
             saveState();
         }
 
-        // ======================================================
-        // 22. MODALS
-        // ======================================================
+        // MODALS
         function openModal(id) { document.getElementById(id).classList.add('open'); }
-
         function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
         function openAccountModal() {
@@ -3952,17 +4182,14 @@
             triggerToast('📋 Referral link copied!', 'gold');
         }
 
-        // ======================================================
-        // 23. DEPOSIT SYSTEM
-        // ======================================================
+        // DEPOSIT SYSTEM
         function selectDepositCoin(coin) {
             activeCoin = coin;
             const wallet = WALLETS[coin];
             document.getElementById('coinLabel').textContent = wallet.label;
             document.getElementById('depositAddressText').textContent = wallet.address;
             document.getElementById('depositNote').textContent = wallet.note;
-            document.getElementById('depositQR').src =
-                `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(wallet.address)}`;
+            document.getElementById('depositQR').src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(wallet.address)}`;
 
             ['BTC', 'ETH', 'USDC', 'SOL', 'LTC'].forEach(c => {
                 const btn = document.getElementById(`tab${c}`);
@@ -3976,9 +4203,7 @@
             triggerToast(`📋 ${activeCoin} address copied!`, 'gold');
         }
 
-        // ======================================================
-        // 24. WITHDRAW
-        // ======================================================
+        // WITHDRAW
         function processWithdraw() {
             const address = document.getElementById('withdrawAddress').value.trim();
             const amount = parseFloat(document.getElementById('withdrawAmount').value);
@@ -4003,9 +4228,7 @@
             document.getElementById('withdrawAmount').value = '';
         }
 
-        // ======================================================
-        // 25. LEADERBOARD
-        // ======================================================
+        // LEADERBOARD
         function getLeaderboardData(period = 'weekly') {
             const realUsers = allUsers.filter(u => u.username && u.username !== 'Guest' && u.totalWagered > 0);
             const realData = realUsers.map(u => ({
@@ -4050,49 +4273,45 @@
             const periodLabel = period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : 'All Time';
 
             if (data.length === 0) {
-                container.innerHTML =
-                    `<div class="leaderboard-empty">🏆 No players yet this ${periodLabel.toLowerCase()}.</div>`;
+                container.innerHTML = `<div class="leaderboard-empty">🏆 No players yet this ${periodLabel.toLowerCase()}.</div>`;
                 return;
             }
 
             const rankClasses = ['gold', 'silver', 'bronze'];
             container.innerHTML = `
-                    <div style="font-size:0.6rem;color:var(--text-muted);text-align:center;margin-bottom:6px;">${periodLabel}</div>
-                    ${data.slice(0, 25).map(item => `
-                        <div class="leaderboard-entry">
-                            <div class="rank ${rankClasses[item.rank-1] || ''}">#${item.rank}</div>
-                            <div class="name">
-                                ${item.name}
-                                ${item.rank <= 3 ? `<span class="vip-icon">${['🥇','🥈','🥉'][item.rank-1]}</span>` : ''}
-                                ${item.isReal ? '⭐' : ''}
-                            </div>
-                            <div class="amount">+$${item.amount.toFixed(2)}</div>
-                            <div class="bets">${item.bets}</div>
+                <div style="font-size:0.6rem;color:var(--text-muted);text-align:center;margin-bottom:6px;">${periodLabel}</div>
+                ${data.slice(0, 25).map(item => `
+                    <div class="leaderboard-entry">
+                        <div class="rank ${rankClasses[item.rank-1] || ''}">#${item.rank}</div>
+                        <div class="name">
+                            ${item.name}
+                            ${item.rank <= 3 ? `<span class="vip-icon">${['🥇','🥈','🥉'][item.rank-1]}</span>` : ''}
+                            ${item.isReal ? '⭐' : ''}
                         </div>
-                    `).join('')}
-                `;
+                        <div class="amount">+$${item.amount.toFixed(2)}</div>
+                        <div class="bets">${item.bets}</div>
+                    </div>
+                `).join('')}
+            `;
         }
 
-        // ======================================================
-        // 26. TOP MULTIPLIERS - FIXED
-        // ======================================================
+        // TOP MULTIPLIERS
         function addTopMultiplier(name, amount, mult) {
             const track = document.getElementById('multipliersTrack');
             const card = document.createElement('div');
             card.className = 'multiplier-card-mini';
             card.innerHTML = `
-                    <span>🔥</span>
-                    <span style="font-weight:700;">${name}</span>
-                    <span class="multiplier-x">${mult}x</span>
-                    <span class="multiplier-amount">+$${amount.toFixed(2)}</span>
-                `;
+                <span>🔥</span>
+                <span style="font-weight:700;">${name}</span>
+                <span class="multiplier-x">${mult}x</span>
+                <span class="multiplier-amount">+$${amount.toFixed(2)}</span>
+            `;
             track.insertBefore(card, track.firstChild);
             if (track.children.length > 8) track.removeChild(track.lastChild);
         }
 
         function populateTopMultipliers() {
             const track = document.getElementById('multipliersTrack');
-            // Clear existing
             track.innerHTML = '';
             const count = 5;
             for (let i = 0; i < count; i++) {
@@ -4114,33 +4333,29 @@
             }, delay);
         }
 
-        // ======================================================
-        // 27. LIVE WINS - FIXED
-        // ======================================================
-        const winsTrack = document.getElementById('winsTrack');
-
+        // LIVE WINS
         function recordLiveBet(game, user, betVal, multVal, isWin) {
             if (!isWin) return;
+            const track = document.getElementById('winsTrack');
             const card = document.createElement('div');
             card.className = 'win-card-mini';
             const winAmt = (betVal * multVal).toFixed(2);
             card.innerHTML = `
-                    <div class="win-thumb">🟢</div>
-                    <div class="win-details">
-                        <div class="win-user">${user}</div>
-                        <div style="display:flex;gap:4px;font-size:0.55rem;color:var(--text-muted);">
-                            <span class="win-game-name">${game}</span>
-                            <span class="win-amount">+$${winAmt}</span>
-                        </div>
+                <div class="win-thumb">🟢</div>
+                <div class="win-details">
+                    <div class="win-user">${user}</div>
+                    <div style="display:flex;gap:4px;font-size:0.55rem;color:var(--text-muted);">
+                        <span class="win-game-name">${game}</span>
+                        <span class="win-amount">+$${winAmt}</span>
                     </div>
-                `;
-            winsTrack.insertBefore(card, winsTrack.firstChild);
-            if (winsTrack.children.length > 8) winsTrack.removeChild(winsTrack.lastChild);
+                </div>
+            `;
+            track.insertBefore(card, track.firstChild);
+            if (track.children.length > 8) track.removeChild(track.lastChild);
         }
 
         function populateLiveWins() {
             const track = document.getElementById('winsTrack');
-            // Clear existing
             track.innerHTML = '';
             const count = 4;
             const games = ['Plinko', 'Mines', 'Slots', 'Dice', 'Crash', 'Wheel'];
@@ -4166,35 +4381,19 @@
             }, delay);
         }
 
-        // ======================================================
-        // 28. GAME LIST
-        // ======================================================
+        // GAME LIST
         const gamesList = [
-            // Slots & Trending
-            { id: 'wanted-dead', name: 'Wanted Dead or Wild', cat: 'trending', img: 'Screenshot 2026-07-20 054300.png',
-                provider: 'Hacksaw Gaming' },
-            { id: 'starlight-princess', name: 'Starlight Princess 1000', cat: 'trending',
-                img: 'Screenshot 2026-07-20 054217.png', provider: 'Pragmatic Play' },
-            { id: 'gates-olympus', name: 'Gates of Valhalla', cat: 'trending', img: 'Screenshot 2026-07-20 053857.png',
-                provider: 'Pragmatic Play' },
-            { id: 'razor-shark', name: 'Razor Shark Return', cat: 'trending', img: 'Screenshot 2026-07-20 053619.png',
-                provider: 'Push Gaming' },
-            { id: 'sweet-bonanza', name: 'Sweet Sugar Rush', cat: 'new', img: 'Screenshot 2026-07-20 053818.png',
-                provider: 'Pragmatic Play' },
-            { id: 'san-quentin', name: 'San Quentin xWays', cat: 'new', img: 'Screenshot 2026-07-20 053953.png',
-                provider: 'Nolimit City' },
-            { id: 'book-dead', name: 'Book of Anubis', cat: 'new', img: 'Screenshot 2026-07-20 054112.png',
-                provider: 'Play\'n GO' },
-            { id: 'golden-buffalo', name: 'Golden Buffalo Megaways', cat: 'new', img: 'Screenshot 2026-07-20 045606.png',
-                provider: 'BetVora Games' },
-            { id: 'cai-shen-panda', name: 'Cai Shen Dai Panda', cat: 'recommended', img: 'Screenshot 2026-07-20 045123.png',
-                provider: 'BetVora Games' },
-            { id: '777-deluxe', name: '777 Deluxe Jackpot', cat: 'recommended', img: 'Screenshot 2026-07-20 045225.png',
-                provider: 'BetVora Games' },
-            { id: 'burning-chilli', name: 'Burning Chilli 243', cat: 'recommended', img: 'Screenshot 2026-07-20 045410.png',
-                provider: 'BetVora Games' },
-
-            // ORIGINALS
+            { id: 'wanted-dead', name: 'Wanted Dead or Wild', cat: 'trending', icon: '🤠', provider: 'Hacksaw Gaming' },
+            { id: 'starlight-princess', name: 'Starlight Princess 1000', cat: 'trending', icon: '👸', provider: 'Pragmatic Play' },
+            { id: 'gates-olympus', name: 'Gates of Valhalla', cat: 'trending', icon: '🏛️', provider: 'Pragmatic Play' },
+            { id: 'razor-shark', name: 'Razor Shark Return', cat: 'trending', icon: '🦈', provider: 'Push Gaming' },
+            { id: 'sweet-bonanza', name: 'Sweet Sugar Rush', cat: 'new', icon: '🍬', provider: 'Pragmatic Play' },
+            { id: 'san-quentin', name: 'San Quentin xWays', cat: 'new', icon: '⛓️', provider: 'Nolimit City' },
+            { id: 'book-dead', name: 'Book of Anubis', cat: 'new', icon: '📖', provider: 'Play\'n GO' },
+            { id: 'golden-buffalo', name: 'Golden Buffalo Megaways', cat: 'new', icon: '🦬', provider: 'BetVora Games' },
+            { id: 'cai-shen-panda', name: 'Cai Shen Dai Panda', cat: 'recommended', icon: '🐼', provider: 'BetVora Games' },
+            { id: '777-deluxe', name: '777 Deluxe Jackpot', cat: 'recommended', icon: '🎰', provider: 'BetVora Games' },
+            { id: 'burning-chilli', name: 'Burning Chilli 243', cat: 'recommended', icon: '🌶️', provider: 'BetVora Games' },
             { id: 'plinko', name: 'Plinko Deluxe', cat: 'originals', icon: '🟢', house: true, provider: 'BetVora Original' },
             { id: 'mines', name: 'Minesweeper', cat: 'originals', icon: '💣', house: true, provider: 'BetVora Original' },
             { id: 'dice', name: 'Dice Roll', cat: 'originals', icon: '🎲', house: true, provider: 'BetVora Original' },
@@ -4207,48 +4406,30 @@
             { id: 'coinflip', name: 'Coin Flip Duel', cat: 'originals', icon: '🪙', house: true, provider: 'BetVora Original' },
             { id: 'limbo', name: 'Limbo Extreme', cat: 'originals', icon: '⚡', house: true, provider: 'BetVora Original' },
             { id: 'pachinko', name: 'Pachinko Deluxe', cat: 'originals', icon: '🔮', house: true, provider: 'BetVora Original' },
-            { id: 'rock-paper-scissors', name: 'RPS Champ', cat: 'originals', icon: '✊', house: true,
-                provider: 'BetVora Original' },
-
-            // Arcade
+            { id: 'rock-paper-scissors', name: 'RPS Champ', cat: 'originals', icon: '✊', house: true, provider: 'BetVora Original' },
             { id: 'whack-mole', name: 'Whack The Mole', cat: 'arcade', icon: '🐹', house: false, provider: 'BetVora Arcade' },
             { id: 'coin-flip', name: 'Double Coin Flip', cat: 'arcade', icon: '🪙', house: false, provider: 'BetVora Arcade' },
             { id: 'chicken-cross', name: 'Road Crossing', cat: 'arcade', icon: '🐔', house: false, provider: 'BetVora Arcade' },
-
-            // Live Casino
             { id: 'roulette', name: 'VIP Lightning Roulette', cat: 'live', icon: '🎡', house: false, provider: 'Evolution' },
             { id: 'blackjack', name: 'Infinite Blackjack', cat: 'live', icon: '🃏', house: false, provider: 'Evolution' },
             { id: 'baccarat', name: 'Speed Baccarat A', cat: 'live', icon: '🎴', house: false, provider: 'Evolution' },
-            { id: 'live-blackjack', name: 'Live Blackjack VIP', cat: 'live-tables', icon: '🃏', house: false,
-                provider: 'Evolution' },
-            { id: 'live-roulette', name: 'Immersive Roulette', cat: 'live-tables', icon: '🎡', house: false,
-                provider: 'Evolution' },
-            { id: 'live-baccarat', name: 'No Commission Baccarat', cat: 'live-tables', icon: '🎴', house: false,
-                provider: 'Evolution' },
-            { id: 'live-poker', name: 'Texas Hold\'em Live', cat: 'live-tables', icon: '♠️', house: false,
-                provider: 'Pragmatic Live' },
+            { id: 'live-blackjack', name: 'Live Blackjack VIP', cat: 'live-tables', icon: '🃏', house: false, provider: 'Evolution' },
+            { id: 'live-roulette', name: 'Immersive Roulette', cat: 'live-tables', icon: '🎡', house: false, provider: 'Evolution' },
+            { id: 'live-baccarat', name: 'No Commission Baccarat', cat: 'live-tables', icon: '🎴', house: false, provider: 'Evolution' },
+            { id: 'live-poker', name: 'Texas Hold\'em Live', cat: 'live-tables', icon: '♠️', house: false, provider: 'Pragmatic Live' },
             { id: 'crazy-time', name: 'Crazy Wheel Time', cat: 'game-shows', icon: '🎪', house: false, provider: 'Evolution' },
-            { id: 'monopoly-live', name: 'Monopoly Big Baller', cat: 'game-shows', icon: '🎩', house: false,
-                provider: 'Evolution' },
+            { id: 'monopoly-live', name: 'Monopoly Big Baller', cat: 'game-shows', icon: '🎩', house: false, provider: 'Evolution' },
             { id: 'dream-catcher', name: 'Dream Catcher', cat: 'game-shows', icon: '🎯', house: false, provider: 'Evolution' },
-            { id: 'deal-no-deal', name: 'Deal or No Deal Live', cat: 'game-shows', icon: '💼', house: false,
-                provider: 'Evolution' },
-
-            // Sports
-            { id: 'sports-epl', name: 'Premier League: Real Madrid vs City', cat: 'sports', icon: '⚽', house: false,
-                provider: 'Sportsbook Live' },
-            { id: 'sports-nba', name: 'NBA Finals: Lakers vs Celtics', cat: 'sports', icon: '🏀', house: false,
-                provider: 'Sportsbook Live' },
-            { id: 'sports-ufc', name: 'UFC 310: Heavyweight Title', cat: 'sports', icon: '🥊', house: false,
-                provider: 'Sportsbook Live' },
+            { id: 'deal-no-deal', name: 'Deal or No Deal Live', cat: 'game-shows', icon: '💼', house: false, provider: 'Evolution' },
+            { id: 'sports-epl', name: 'Premier League: Real Madrid vs City', cat: 'sports', icon: '⚽', house: false, provider: 'Sportsbook Live' },
+            { id: 'sports-nba', name: 'NBA Finals: Lakers vs Celtics', cat: 'sports', icon: '🏀', house: false, provider: 'Sportsbook Live' },
+            { id: 'sports-ufc', name: 'UFC 310: Heavyweight Title', cat: 'sports', icon: '🥊', house: false, provider: 'Sportsbook Live' },
             { id: 'sports-csgo', name: 'CS:GO Major Finals', cat: 'sports', icon: '🎮', house: false, provider: 'eSports Live' },
             { id: 'sports-nfl', name: 'NFL Super Bowl LVII', cat: 'sports', icon: '🏈', house: false, provider: 'Sportsbook Live' },
             { id: 'sports-tennis', name: 'Wimbledon Finals', cat: 'sports', icon: '🎾', house: false, provider: 'Sportsbook Live' }
         ];
 
-        // ======================================================
-        // 29. RENDER CATALOG
-        // ======================================================
+        // RENDER CATALOG
         function renderCatalog(filter = 'all') {
             const container = document.getElementById('catalogSectionsContainer');
             container.innerHTML = '';
@@ -4269,11 +4450,9 @@
             if (filter === 'all') {
                 sectionsToShow = allSections;
             } else if (filter === 'slots') {
-                sectionsToShow = allSections.filter(sec => sec.id === 'trending' || sec.id === 'new' || sec.id ===
-                'recommended');
+                sectionsToShow = allSections.filter(sec => sec.id === 'trending' || sec.id === 'new' || sec.id === 'recommended');
             } else if (filter === 'live') {
-                sectionsToShow = allSections.filter(sec => sec.id === 'live' || sec.id === 'live-tables' || sec.id ===
-                    'game-shows');
+                sectionsToShow = allSections.filter(sec => sec.id === 'live' || sec.id === 'live-tables' || sec.id === 'game-shows');
             } else {
                 sectionsToShow = allSections.filter(sec => sec.id === filter);
             }
@@ -4285,12 +4464,12 @@
                 block.className = 'section-block';
 
                 block.innerHTML = `
-                        <div class="section-heading">
-                            <div class="section-title-text">${sec.title}</div>
-                            ${filter === 'all' ? `<div class="see-all-link" onclick="filterCategory('${sec.id}')">See All (${sec.games.length}) →</div>` : ''}
-                        </div>
-                        <div class="games-grid" id="grid-${sec.id}"></div>
-                    `;
+                    <div class="section-heading">
+                        <div class="section-title-text">${sec.title}</div>
+                        ${filter === 'all' ? `<div class="see-all-link" onclick="filterCategory('${sec.id}')">See All (${sec.games.length}) →</div>` : ''}
+                    </div>
+                    <div class="games-grid" id="grid-${sec.id}"></div>
+                `;
 
                 container.appendChild(block);
 
@@ -4300,9 +4479,9 @@
                     card.className = 'game-thumb-card';
                     card.onclick = () => launchGame(g.id);
 
-                    const visualContent = g.img ?
-                        `<img src="${g.img}" alt="${g.name}" class="card-img-banner">` :
-                        `<div class="thumb-visual">${g.icon}</div>`;
+                    const visualContent = g.icon ?
+                        `<div class="thumb-visual">${g.icon}</div>` :
+                        `<div class="thumb-visual">🎮</div>`;
 
                     let tag = '';
                     if (g.house) tag = '<div class="badge-tag">ORIGINAL</div>';
@@ -4312,24 +4491,22 @@
                     else if (g.cat === 'new') tag = '<div class="badge-tag new">🆕 NEW</div>';
 
                     card.innerHTML = `
-                            ${tag}
-                            ${visualContent}
-                            <div class="play-overlay">
-                                <div class="play-btn">▶ PLAY</div>
-                            </div>
-                            <div class="card-info">
-                                <div class="game-title">${g.name}</div>
-                                <div class="game-sub">${g.provider}</div>
-                            </div>
-                        `;
+                        ${tag}
+                        ${visualContent}
+                        <div class="play-overlay">
+                            <div class="play-btn">▶ PLAY</div>
+                        </div>
+                        <div class="card-info">
+                            <div class="game-title">${g.name}</div>
+                            <div class="game-sub">${g.provider}</div>
+                        </div>
+                    `;
                     grid.appendChild(card);
                 });
             });
         }
 
-        // ======================================================
-        // 30. FILTER FUNCTION
-        // ======================================================
+        // FILTER FUNCTION
         function filterCategory(cat) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -4363,9 +4540,7 @@
             filterCategory(mode === 'sports' ? 'sports' : 'all');
         }
 
-        // ======================================================
-        // 31. GAME LAUNCHER
-        // ======================================================
+        // GAME LAUNCHER
         function launchGame(id) {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Please login first', 'loss');
@@ -4419,8 +4594,7 @@
             } else if (gameObj && (gameObj.cat === 'live' || gameObj.cat === 'live-tables' || gameObj.cat === 'game-shows')) {
                 triggerToast(`🎥 Joining ${gameObj.name}...`, 'gold');
             } else {
-                document.getElementById('activeSlotTitle').textContent = gameObj ? `🎰 ${gameObj.name.toUpperCase()}` :
-                    '🎰 CYBER SLOTS';
+                document.getElementById('activeSlotTitle').textContent = gameObj ? `🎰 ${gameObj.name.toUpperCase()}` : '🎰 CYBER SLOTS';
                 document.getElementById('stageSlots').classList.add('active');
             }
         }
@@ -4437,52 +4611,7 @@
             if (dynModal) dynModal.innerHTML = '';
         }
 
-        // ======================================================
-        // 32. PLINKO
-        // ======================================================
-        function dropPlinko() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('plinkoBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const slots = [0.5, 1.2, 5.0, 1.2, 0.5];
-            const randIdx = Math.floor(Math.random() * slots.length);
-            const mult = slots[randIdx];
-
-            document.getElementById('plinkoDropVisual').textContent = '🟡';
-            document.getElementById('plinkoStatusText').textContent = 'Dropping...';
-
-            setTimeout(() => {
-                const win = bet * mult;
-                if (mult >= 1) {
-                    userBalance += win;
-                    triggerToast(`🎯 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
-                    playSound('win');
-                    fireConfetti(20);
-                    addTopMultiplier(currentUser.name, win, mult);
-                    addBetHistory('Plinko', bet, win, true);
-                    addTransaction('game_win', win, 'Plinko win');
-                    recordLiveBet('Plinko', currentUser.name, bet, mult, true);
-                } else {
-                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
-                    playSound('loss');
-                    addBetHistory('Plinko', bet, 0, false);
-                }
-                updateBalance();
-                document.getElementById('plinkoStatusText').textContent = `Landed on ${mult}x!`;
-                document.getElementById('plinkoDropVisual').textContent = '⚪';
-                updateDegenerateStats();
-                saveState();
-            }, 600);
-        }
-
-        // ======================================================
-        // 33. MINES
-        // ======================================================
+        // MINES GRID INIT
         function initMinesGrid() {
             const grid = document.getElementById('minesGrid');
             grid.innerHTML = '';
@@ -4495,317 +4624,10 @@
             }
         }
 
-        function startMines() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('minesBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            minesBet = bet;
-            updateBalance();
-
-            const bombsCount = parseInt(document.getElementById('minesBombs').value);
-            minesState = Array(25).fill('gem');
-            let placed = 0;
-            while (placed < bombsCount) {
-                const r = Math.floor(Math.random() * 25);
-                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb';
-                    placed++; }
-            }
-
-            safeRevealed = 0;
-            minesActive = true;
-            initMinesGrid();
-
-            document.getElementById('startMinesBtn').style.display = 'none';
-            document.getElementById('cashoutMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
-        }
-
-        function pickMine(idx, el) {
-            if (!minesActive || el.classList.contains('revealed-gem')) return;
-
-            if (minesState[idx] === 'bomb') {
-                el.classList.add('revealed-bomb');
-                el.textContent = '💣';
-                minesActive = false;
-                triggerToast('💥 Hit a mine!', 'loss');
-                playSound('loss');
-                addBetHistory('Mines', minesBet, 0, false);
-                document.getElementById('startMinesBtn').style.display = 'block';
-                document.getElementById('cashoutMinesBtn').style.display = 'none';
-                updateDegenerateStats();
-                saveState();
-            } else {
-                el.classList.add('revealed-gem');
-                el.textContent = '💎';
-                safeRevealed++;
-                const mult = (1 + safeRevealed * 0.2);
-                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
-            }
-        }
-
-        function cashoutMines() {
-            if (!minesActive) return;
-            const mult = (1 + safeRevealed * 0.2);
-            const win = minesBet * mult;
-            userBalance += win;
-            updateBalance();
-            minesActive = false;
-            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
-            playSound('win');
-            fireConfetti(15);
-            addTopMultiplier(currentUser.name, win, mult);
-            addBetHistory('Mines', minesBet, win, true);
-            addTransaction('game_win', win, 'Mines win');
-            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
-            document.getElementById('startMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').style.display = 'none';
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // ======================================================
-        // 34. SLOTS
-        // ======================================================
+        // SLOTS SYMBOLS
         const slotSyms = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
 
-        function spinSlots() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('slotsBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const s1 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s2 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s3 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-
-            document.getElementById('r1').textContent = s1;
-            document.getElementById('r2').textContent = s2;
-            document.getElementById('r3').textContent = s3;
-
-            let mult = 0;
-            if (s1 === s2 && s2 === s3) mult = 5.0;
-            else if (s1 === s2 || s2 === s3) mult = 1.5;
-
-            if (mult > 0) {
-                const win = bet * mult;
-                userBalance += win;
-                triggerToast(`🎰 +$${win.toFixed(2)}!`, 'win');
-                playSound('win');
-                if (mult >= 5) {
-                    fireConfetti(50);
-                    playSound('jackpot');
-                    addTopMultiplier(currentUser.name, win, mult);
-                } else {
-                    fireConfetti(15);
-                }
-                addBetHistory('Slots', bet, win, true);
-                addTransaction('game_win', win, 'Slots win');
-                recordLiveBet('Slots', currentUser.name, bet, mult, true);
-            } else {
-                triggerToast(`💔 No win this time`, 'loss');
-                playSound('loss');
-                addBetHistory('Slots', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // ======================================================
-        // 35. DICE
-        // ======================================================
-        function rollDice() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('diceBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            const roll = (Math.random() * 100).toFixed(2);
-            document.getElementById('diceResultDisplay').textContent = roll;
-
-            const win = parseFloat(roll) < 50;
-            if (win) {
-                const winAmt = bet * 1.98;
-                userBalance += winAmt;
-                triggerToast(`🎲 +$${winAmt.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addTopMultiplier(currentUser.name, winAmt, 1.98);
-                addBetHistory('Dice', bet, winAmt, true);
-                addTransaction('game_win', winAmt, 'Dice win');
-                recordLiveBet('Dice', currentUser.name, bet, 1.98, true);
-            } else {
-                triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Dice', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // ======================================================
-        // 36. CRASH
-        // ======================================================
-        let crashActive = false;
-        let crashMultiplier = 1.0;
-        let crashInterval = null;
-        let crashBetAmount = 0;
-        let crashCashedOut = false;
-
-        function resetCrash() {
-            crashActive = false;
-            crashMultiplier = 1.0;
-            crashCashedOut = false;
-            if (crashInterval) { clearInterval(crashInterval);
-                crashInterval = null; }
-            document.getElementById('crashMultiplierDisplay').textContent = '1.00x';
-            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
-            document.getElementById('crashBarFill').style.width = '0%';
-            document.getElementById('crashStatus').textContent = 'Place your bet and watch the multiplier climb!';
-            document.getElementById('crashStartBtn').style.display = 'inline-flex';
-            document.getElementById('crashCashoutBtn').style.display = 'none';
-        }
-
-        function startCrash() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            if (crashActive) { triggerToast('Game already running!', 'gold'); return; }
-
-            const bet = parseFloat(document.getElementById('crashBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            crashBetAmount = bet;
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            crashActive = true;
-            crashMultiplier = 1.0;
-            crashCashedOut = false;
-            document.getElementById('crashStartBtn').style.display = 'none';
-            document.getElementById('crashCashoutBtn').style.display = 'inline-flex';
-            document.getElementById('crashStatus').textContent = '🚀 Flying...';
-            document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display';
-
-            const crashPoint = 1.0 + Math.random() * 14;
-
-            crashInterval = setInterval(() => {
-                crashMultiplier += 0.01;
-                const displayMult = crashMultiplier.toFixed(2);
-                document.getElementById('crashMultiplierDisplay').textContent = displayMult + 'x';
-                document.getElementById('crashBarFill').style.width = Math.min((crashMultiplier / 15) * 100, 100) +
-                '%';
-
-                if (crashMultiplier >= crashPoint) {
-                    clearInterval(crashInterval);
-                    crashInterval = null;
-                    crashActive = false;
-                    document.getElementById('crashMultiplierDisplay').className = 'crash-multiplier-display crashed';
-                    document.getElementById('crashStatus').textContent = `💥 Crashed at ${crashMultiplier.toFixed(2)}x!`;
-                    document.getElementById('crashStartBtn').style.display = 'inline-flex';
-                    document.getElementById('crashCashoutBtn').style.display = 'none';
-
-                    if (!crashCashedOut) {
-                        triggerToast(`💥 Crashed at ${crashMultiplier.toFixed(2)}x! Lost $${crashBetAmount.toFixed(2)}`,
-                            'loss');
-                        playSound('loss');
-                        addBetHistory('Crash', crashBetAmount, 0, false);
-                    }
-                    updateDegenerateStats();
-                    saveState();
-                }
-            }, 50);
-        }
-
-        function cashoutCrash() {
-            if (!crashActive || crashCashedOut) return;
-            crashCashedOut = true;
-            const win = crashBetAmount * crashMultiplier;
-            userBalance += win;
-            updateBalance();
-            triggerToast(`💎 Cashed out at ${crashMultiplier.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
-            playSound('win');
-            fireConfetti(30);
-            addTopMultiplier(currentUser.name, win, crashMultiplier);
-            addBetHistory('Crash', crashBetAmount, win, true);
-            addTransaction('game_win', win, 'Crash win');
-            recordLiveBet('Crash', currentUser.name, crashBetAmount, crashMultiplier, true);
-            document.getElementById('crashCashoutBtn').style.display = 'none';
-            document.getElementById('crashStatus').textContent = `✅ Cashed out at ${crashMultiplier.toFixed(2)}x!`;
-            updateDegenerateStats();
-            saveState();
-        }
-
-        // ======================================================
-        // 37. WHEEL
-        // ======================================================
-        function spinWheel() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('wheelBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
-            const weights = [20, 25, 20, 15, 10, 7, 3];
-            let totalWeight = weights.reduce((a, b) => a + b, 0);
-            let rand = Math.random() * totalWeight;
-            let selected = 0;
-            for (let i = 0; i < weights.length; i++) {
-                rand -= weights[i];
-                if (rand <= 0) { selected = i; break; }
-            }
-
-            const mult = multipliers[selected];
-            const win = bet * mult;
-            const wheel = document.getElementById('wheelSpin');
-
-            const spins = 5 + Math.random() * 5;
-            const degrees = spins * 360 + (selected / multipliers.length) * 360;
-            wheel.style.transform = `rotate(${degrees}deg)`;
-
-            document.getElementById('wheelResult').textContent = '🎡 Spinning...';
-
-            setTimeout(() => {
-                if (mult >= 1) {
-                    userBalance += win;
-                    triggerToast(`🎡 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
-                    playSound('win');
-                    if (mult >= 5) {
-                        fireConfetti(50);
-                        playSound('jackpot');
-                        addTopMultiplier(currentUser.name, win, mult);
-                    } else {
-                        fireConfetti(20);
-                    }
-                    addBetHistory('Wheel', bet, win, true);
-                    addTransaction('game_win', win, 'Wheel win');
-                    recordLiveBet('Wheel', currentUser.name, bet, mult, true);
-                } else {
-                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
-                    playSound('loss');
-                    addBetHistory('Wheel', bet, 0, false);
-                }
-                updateBalance();
-                document.getElementById('wheelResult').textContent =
-                    `🎯 ${mult}x! ${mult >= 1 ? '+$' + win.toFixed(2) : 'Lost $' + bet.toFixed(2)}`;
-                updateDegenerateStats();
-                saveState();
-            }, 4000);
-        }
-
-        // ======================================================
-        // 38. HI-LO
-        // ======================================================
+        // HI-LO
         let hiloStreak = 0;
         let hiloCurrentCard = null;
         let hiloBetAmount = 1.0;
@@ -4818,35 +4640,35 @@
             modal.className = 'modal-overlay open';
             modal.id = 'hiloModal';
             modal.innerHTML = `
-                    <div class="modal-card enhanced" style="max-width:400px;">
-                        <div class="modal-header">
-                            <h3>🃏 Hi-Lo Challenge</h3>
-                            <span style="cursor:pointer;color:var(--text-muted);position:absolute;top:16px;right:20px;" onclick="document.getElementById('hiloModal').remove()">✕</span>
+                <div class="modal-card enhanced" style="max-width:400px;">
+                    <div class="modal-header">
+                        <h3>🃏 Hi-Lo Challenge</h3>
+                        <span style="cursor:pointer;color:var(--text-muted);position:absolute;top:16px;right:20px;" onclick="document.getElementById('hiloModal').remove()">✕</span>
+                    </div>
+                    <div style="text-align:center;padding:20px 0;">
+                        <div style="font-size:4rem;margin-bottom:10px;" id="hiloCard">🃏</div>
+                        <div style="font-size:1.2rem;font-weight:900;color:var(--brand-gold);" id="hiloValue">? (1-13)</div>
+                        <div style="display:flex;gap:12px;justify-content:center;margin:16px 0;">
+                            <button class="btn btn-primary" onclick="playHilo('higher')">⬆ Higher</button>
+                            <button class="btn btn-red" onclick="playHilo('lower')">⬇ Lower</button>
                         </div>
-                        <div style="text-align:center;padding:20px 0;">
-                            <div style="font-size:4rem;margin-bottom:10px;" id="hiloCard">🃏</div>
-                            <div style="font-size:1.2rem;font-weight:900;color:var(--brand-gold);" id="hiloValue">? (1-13)</div>
-                            <div style="display:flex;gap:12px;justify-content:center;margin:16px 0;">
-                                <button class="btn btn-primary" onclick="playHilo('higher')">⬆ Higher</button>
-                                <button class="btn btn-red" onclick="playHilo('lower')">⬇ Lower</button>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">Current bet: $<span id="hiloBetDisplay">1.00</span></div>
+                        <div style="margin:8px 0;">
+                            <input type="number" id="hiloBetInput" value="1.00" min="0.10" step="0.5" style="width:100px;text-align:center;">
+                            <div class="quick-bets" style="justify-content:center;">
+                                <button class="btn" onclick="quickBet('hiloBetInput',25)">25%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',50)">50%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',75)">75%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',100)">100%</button>
                             </div>
-                            <div style="font-size:0.7rem;color:var(--text-muted);">Current bet: $<span id="hiloBetDisplay">1.00</span></div>
-                            <div style="margin:8px 0;">
-                                <input type="number" id="hiloBetInput" value="1.00" min="0.10" step="0.5" style="width:100px;text-align:center;">
-                                <div class="quick-bets" style="justify-content:center;">
-                                    <button class="btn" onclick="quickBet('hiloBetInput',25)">25%</button>
-                                    <button class="btn" onclick="quickBet('hiloBetInput',50)">50%</button>
-                                    <button class="btn" onclick="quickBet('hiloBetInput',75)">75%</button>
-                                    <button class="btn" onclick="quickBet('hiloBetInput',100)">100%</button>
-                                </div>
-                                <button class="btn btn-green" onclick="startHiloRound()" style="margin-top:6px;">Start Round</button>
-                            </div>
-                            <div style="font-size:0.6rem;color:var(--text-muted);margin-top:8px;">
-                                Win streak: <span id="hiloStreakDisplay" style="color:var(--brand-green);font-weight:900;">0</span>
-                            </div>
+                            <button class="btn btn-green" onclick="startHiloRound()" style="margin-top:6px;">Start Round</button>
+                        </div>
+                        <div style="font-size:0.6rem;color:var(--text-muted);margin-top:8px;">
+                            Win streak: <span id="hiloStreakDisplay" style="color:var(--brand-green);font-weight:900;">0</span>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
             document.body.appendChild(modal);
 
             hiloStreak = 0;
@@ -4929,9 +4751,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 39. TOWER
-        // ======================================================
+        // TOWER
         function launchTower() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -4994,9 +4814,7 @@
             }
         }
 
-        // ======================================================
-        // 40. KENO
-        // ======================================================
+        // KENO
         function launchKeno() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5046,9 +4864,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 41. COIN FLIP
-        // ======================================================
+        // COIN FLIP
         function launchCoinFlip() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5084,9 +4900,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 42. LIMBO
-        // ======================================================
+        // LIMBO
         function launchLimbo() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5125,9 +4939,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 43. PACHINKO
-        // ======================================================
+        // PACHINKO
         function launchPachinko() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5163,9 +4975,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 44. ROCK PAPER SCISSORS
-        // ======================================================
+        // ROCK PAPER SCISSORS
         function launchRPS() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5220,9 +5030,65 @@
             saveState();
         }
 
-        // ======================================================
-        // 45. SEARCH
-        // ======================================================
+        // WHEEL
+        function spinWheel() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('wheelBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
+            const weights = [20, 25, 20, 15, 10, 7, 3];
+            let totalWeight = weights.reduce((a, b) => a + b, 0);
+            let rand = Math.random() * totalWeight;
+            let selected = 0;
+            for (let i = 0; i < weights.length; i++) {
+                rand -= weights[i];
+                if (rand <= 0) { selected = i; break; }
+            }
+
+            const mult = multipliers[selected];
+            const win = bet * mult;
+            const wheel = document.getElementById('wheelSpin');
+
+            const spins = 5 + Math.random() * 5;
+            const degrees = spins * 360 + (selected / multipliers.length) * 360;
+            wheel.style.transform = `rotate(${degrees}deg)`;
+
+            document.getElementById('wheelResult').textContent = '🎡 Spinning...';
+
+            setTimeout(() => {
+                if (mult >= 1) {
+                    userBalance += win;
+                    triggerToast(`🎡 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
+                    playSound('win');
+                    if (mult >= 5) {
+                        fireConfetti(50);
+                        playSound('jackpot');
+                        addTopMultiplier(currentUser.name, win, mult);
+                    } else {
+                        fireConfetti(20);
+                    }
+                    addBetHistory('Wheel', bet, win, true);
+                    addTransaction('game_win', win, 'Wheel win');
+                    recordLiveBet('Wheel', currentUser.name, bet, mult, true);
+                } else {
+                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Wheel', bet, 0, false);
+                }
+                updateBalance();
+                document.getElementById('wheelResult').textContent = `🎯 ${mult}x! ${mult >= 1 ? '+$' + win.toFixed(2) : 'Lost $' + bet.toFixed(2)}`;
+                updateDegenerateStats();
+                saveState();
+            }, 4000);
+        }
+
+        // SEARCH
         function handleSearch(val) {
             const resultsContainer = document.getElementById('searchResults');
             if (!val || val.length < 1) {
@@ -5238,8 +5104,7 @@
             }
             matches.slice(0, 8).forEach(m => {
                 const div = document.createElement('div');
-                div.style.cssText =
-                    'padding:4px 8px;background:rgba(255,255,255,0.02);border-radius:4px;cursor:pointer;font-weight:700;font-size:0.7rem;transition:all 0.2s;';
+                div.style.cssText = 'padding:4px 8px;background:rgba(255,255,255,0.02);border-radius:4px;cursor:pointer;font-weight:700;font-size:0.7rem;transition:all 0.2s;';
                 div.textContent = `${m.icon || '🎮'} ${m.name}`;
                 div.onmouseenter = () => { div.style.background = 'rgba(255,255,255,0.05)'; };
                 div.onmouseleave = () => { div.style.background = 'rgba(255,255,255,0.02)'; };
@@ -5261,18 +5126,13 @@
         });
 
         // ======================================================
-        // 46. NEW FEATURES: GAME STATS, LIVE COUNTERS, ETC
-        // ======================================================
-        // These are already integrated into the UI
-
-        // ======================================================
-        // 47. INIT
+        // INIT
         // ======================================================
         loadState();
         renderCatalog();
         updateUI();
 
-        // Populate live wins & top multipliers - CLEAR and FILL properly
+        // Populate live wins & top multipliers
         setTimeout(() => {
             populateTopMultipliers();
             populateLiveWins();
@@ -5281,14 +5141,9 @@
         setTimeout(scheduleTopMultipliers, 10000);
         setTimeout(scheduleLiveWins, 12000);
 
-        console.log('🔥 BETVORA loaded - Premium Crypto Gaming');
-        console.log('💰 Wallets configured:', Object.keys(WALLETS));
-        console.log('🎮 Games loaded:', gamesList.length);
+        console.log('🔥 BETVORA loaded with API backend!');
+        console.log('📡 API URL:', API_URL);
         console.log('👤 User:', currentUser.isLoggedIn ? currentUser.name : 'Guest');
-        console.log('👑 Degen Ranks: Bronze → Silver → Gold → Platinum');
-        console.log('🎯 Bonus Tiers: $100→$10, $500→$50, $1000→$100, $5000→$500, $10000→$980');
-        console.log('📊 Live Wins & Top Multipliers fixed and working!');
-        console.log('👤 Account button fixed and working!');
     </script>
 </body>
 </html>
