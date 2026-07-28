@@ -2762,7 +2762,7 @@
 
     <script>
         // ======================================================
-        // 1. API CONFIGURATION - UPDATED FOR RENDER
+        // 1. API CONFIGURATION
         // ======================================================
         const API_URL = 'https://betvora-backend.onrender.com/api';
         let authToken = localStorage.getItem('authToken');
@@ -2880,7 +2880,7 @@
         }
 
         // ======================================================
-        // 4. BETNEX GAME FUNCTIONS (NEW!)
+        // 4. BETNEX GAME FUNCTIONS
         // ======================================================
 
         // Load games from Betnex
@@ -2950,7 +2950,7 @@
         }
 
         // ======================================================
-        // 5. GAME FUNCTIONS (PLINKO, MINES, SLOTS, ETC.)
+        // 5. GAME FUNCTIONS
         // ======================================================
 
         function dropPlinko() {
@@ -2998,7 +2998,136 @@
         }
 
         // ======================================================
-        // 6. ALL ORIGINAL FUNCTIONS BELOW
+        // 6. RENDER CATALOG - FIXED
+        // ======================================================
+
+        function renderCatalog(filter = 'all') {
+            const container = document.getElementById('catalogSectionsContainer');
+            container.innerHTML = '';
+
+            const allSections = [
+                { id: 'trending', title: '🔥 Trending Slots', games: gamesList.filter(g => g.cat === 'trending') },
+                { id: 'new', title: '🆕 New Releases', games: gamesList.filter(g => g.cat === 'new') },
+                { id: 'originals', title: '💎 BetVora Originals', games: gamesList.filter(g => g.cat === 'originals') },
+                { id: 'recommended', title: '⭐ Recommended Slots', games: gamesList.filter(g => g.cat === 'recommended') },
+                { id: 'arcade', title: '🕹️ Arcade Games', games: gamesList.filter(g => g.cat === 'arcade') },
+                { id: 'live', title: '🎲 Live Casino', games: gamesList.filter(g => g.cat === 'live') },
+                { id: 'live-tables', title: '🎯 Recommended Live Tables', games: gamesList.filter(g => g.cat === 'live-tables') },
+                { id: 'game-shows', title: '🎪 Recommended Game Shows', games: gamesList.filter(g => g.cat === 'game-shows') },
+                { id: 'sports', title: '⚽ Sportsbook', games: gamesList.filter(g => g.cat === 'sports') }
+            ];
+
+            let sectionsToShow = [];
+            if (filter === 'all') {
+                sectionsToShow = allSections;
+            } else if (filter === 'slots') {
+                sectionsToShow = allSections.filter(sec => sec.id === 'trending' || sec.id === 'new' || sec.id === 'recommended');
+            } else if (filter === 'live') {
+                sectionsToShow = allSections.filter(sec => sec.id === 'live' || sec.id === 'live-tables' || sec.id === 'game-shows');
+            } else {
+                sectionsToShow = allSections.filter(sec => sec.id === filter);
+            }
+
+            sectionsToShow.forEach(sec => {
+                if (sec.games.length === 0) return;
+
+                const block = document.createElement('div');
+                block.className = 'section-block';
+
+                block.innerHTML = `
+                    <div class="section-heading">
+                        <div class="section-title-text">${sec.title}</div>
+                        ${filter === 'all' ? `<div class="see-all-link" onclick="filterCategory('${sec.id}')">See All (${sec.games.length}) →</div>` : ''}
+                    </div>
+                    <div class="games-grid" id="grid-${sec.id}"></div>
+                `;
+
+                container.appendChild(block);
+
+                const grid = document.getElementById(`grid-${sec.id}`);
+                sec.games.forEach(g => {
+                    const card = document.createElement('div');
+                    card.className = 'game-thumb-card';
+                    card.onclick = () => launchGame(g.id);
+
+                    const visualContent = g.icon ?
+                        `<div class="thumb-visual">${g.icon}</div>` :
+                        `<div class="thumb-visual">🎮</div>`;
+
+                    let tag = '';
+                    if (g.house) tag = '<div class="badge-tag">ORIGINAL</div>';
+                    else if (g.cat === 'arcade') tag = '<div class="badge-tag arcade">ARCADE</div>';
+                    else if (g.cat === 'sports') tag = '<div class="badge-tag sports">LIVE BET</div>';
+                    else if (g.cat === 'trending') tag = '<div class="badge-tag trending">🔥 TRENDING</div>';
+                    else if (g.cat === 'new') tag = '<div class="badge-tag new">🆕 NEW</div>';
+
+                    card.innerHTML = `
+                        ${tag}
+                        ${visualContent}
+                        <div class="play-overlay">
+                            <div class="play-btn">▶ PLAY</div>
+                        </div>
+                        <div class="card-info">
+                            <div class="game-title">${g.name}</div>
+                            <div class="game-sub">${g.provider}</div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            });
+
+            // Add Betnex games container at the bottom
+            const betnexBlock = document.createElement('div');
+            betnexBlock.className = 'section-block';
+            betnexBlock.innerHTML = `
+                <div class="section-heading">
+                    <div class="section-title-text">🎰 Casino Games</div>
+                </div>
+                <div id="betnexGamesContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
+                    <p style="color:var(--text-muted);">Loading games...</p>
+                </div>
+            `;
+            container.appendChild(betnexBlock);
+        }
+
+        // ======================================================
+        // 7. UPDATE UI - FIXED
+        // ======================================================
+
+        function updateUI() {
+            const displayName = currentUser.isLoggedIn ? currentUser.name : 'Guest';
+            document.getElementById('headerUsername').textContent = displayName;
+            document.getElementById('accountModalName').textContent = displayName;
+            document.getElementById('accountLevel').textContent = currentUser.level || 'Starter';
+            const initial = displayName.charAt(0).toUpperCase();
+            document.getElementById('avatarDisplay').textContent = initial;
+            document.getElementById('accountAvatar').textContent = initial;
+            updateBalance();
+            updateDegenerateStats();
+            updateBetHistory();
+            updateTransactionHistory();
+            updateBonusUI();
+
+            const loginBtn = document.querySelector('.header-right .btn-primary');
+            const registerBtn = document.querySelector('.header-right .btn-green');
+            if (currentUser.isLoggedIn) {
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (registerBtn) registerBtn.style.display = 'none';
+            } else {
+                if (loginBtn) loginBtn.style.display = 'inline-flex';
+                if (registerBtn) registerBtn.style.display = 'inline-flex';
+            }
+            
+            // Load Betnex games when logged in
+            if (currentUser.isLoggedIn) {
+                setTimeout(() => {
+                    loadBetnexGames();
+                }, 500);
+            }
+        }
+
+        // ======================================================
+        // 8. ALL ORIGINAL FUNCTIONS BELOW
         // ======================================================
 
         // NAME ARRAYS
@@ -3743,36 +3872,6 @@
             saveState();
         }
 
-        function updateUI() {
-            const displayName = currentUser.isLoggedIn ? currentUser.name : 'Guest';
-            document.getElementById('headerUsername').textContent = displayName;
-            document.getElementById('accountModalName').textContent = displayName;
-            document.getElementById('accountLevel').textContent = currentUser.level || 'Starter';
-            const initial = displayName.charAt(0).toUpperCase();
-            document.getElementById('avatarDisplay').textContent = initial;
-            document.getElementById('accountAvatar').textContent = initial;
-            updateBalance();
-            updateDegenerateStats();
-            updateBetHistory();
-            updateTransactionHistory();
-            updateBonusUI();
-
-            const loginBtn = document.querySelector('.header-right .btn-primary');
-            const registerBtn = document.querySelector('.header-right .btn-green');
-            if (currentUser.isLoggedIn) {
-                if (loginBtn) loginBtn.style.display = 'none';
-                if (registerBtn) registerBtn.style.display = 'none';
-            } else {
-                if (loginBtn) loginBtn.style.display = 'inline-flex';
-                if (registerBtn) registerBtn.style.display = 'inline-flex';
-            }
-            
-            // Load Betnex games when logged in
-            if (currentUser.isLoggedIn) {
-                loadBetnexGames();
-            }
-        }
-
         function showLoading(show) {
             document.getElementById('loadingOverlay').classList.toggle('active', show);
         }
@@ -4259,97 +4358,6 @@
             { id: 'sports-tennis', name: 'Wimbledon Finals', cat: 'sports', icon: '🎾', house: false, provider: 'Sportsbook Live' }
         ];
 
-        // RENDER CATALOG
-        function renderCatalog(filter = 'all') {
-            const container = document.getElementById('catalogSectionsContainer');
-            container.innerHTML = '';
-
-            const allSections = [
-                { id: 'trending', title: '🔥 Trending Slots', games: gamesList.filter(g => g.cat === 'trending') },
-                { id: 'new', title: '🆕 New Releases', games: gamesList.filter(g => g.cat === 'new') },
-                { id: 'originals', title: '💎 BetVora Originals', games: gamesList.filter(g => g.cat === 'originals') },
-                { id: 'recommended', title: '⭐ Recommended Slots', games: gamesList.filter(g => g.cat === 'recommended') },
-                { id: 'arcade', title: '🕹️ Arcade Games', games: gamesList.filter(g => g.cat === 'arcade') },
-                { id: 'live', title: '🎲 Live Casino', games: gamesList.filter(g => g.cat === 'live') },
-                { id: 'live-tables', title: '🎯 Recommended Live Tables', games: gamesList.filter(g => g.cat === 'live-tables') },
-                { id: 'game-shows', title: '🎪 Recommended Game Shows', games: gamesList.filter(g => g.cat === 'game-shows') },
-                { id: 'sports', title: '⚽ Sportsbook', games: gamesList.filter(g => g.cat === 'sports') }
-            ];
-
-            let sectionsToShow = [];
-            if (filter === 'all') {
-                sectionsToShow = allSections;
-            } else if (filter === 'slots') {
-                sectionsToShow = allSections.filter(sec => sec.id === 'trending' || sec.id === 'new' || sec.id === 'recommended');
-            } else if (filter === 'live') {
-                sectionsToShow = allSections.filter(sec => sec.id === 'live' || sec.id === 'live-tables' || sec.id === 'game-shows');
-            } else {
-                sectionsToShow = allSections.filter(sec => sec.id === filter);
-            }
-
-            sectionsToShow.forEach(sec => {
-                if (sec.games.length === 0) return;
-
-                const block = document.createElement('div');
-                block.className = 'section-block';
-
-                // Add Betnex games container after the first section
-                if (sec.id === 'trending') {
-                    block.innerHTML += `
-                        <div style="margin-top:20px;">
-                            <div class="section-heading">
-                                <div class="section-title-text">🎰 Casino Games</div>
-                            </div>
-                            <div id="betnexGamesContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
-                                <p style="color:var(--text-muted);">Loading games...</p>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                block.innerHTML += `
-                    <div class="section-heading">
-                        <div class="section-title-text">${sec.title}</div>
-                        ${filter === 'all' ? `<div class="see-all-link" onclick="filterCategory('${sec.id}')">See All (${sec.games.length}) →</div>` : ''}
-                    </div>
-                    <div class="games-grid" id="grid-${sec.id}"></div>
-                `;
-
-                container.appendChild(block);
-
-                const grid = document.getElementById(`grid-${sec.id}`);
-                sec.games.forEach(g => {
-                    const card = document.createElement('div');
-                    card.className = 'game-thumb-card';
-                    card.onclick = () => launchGame(g.id);
-
-                    const visualContent = g.icon ?
-                        `<div class="thumb-visual">${g.icon}</div>` :
-                        `<div class="thumb-visual">🎮</div>`;
-
-                    let tag = '';
-                    if (g.house) tag = '<div class="badge-tag">ORIGINAL</div>';
-                    else if (g.cat === 'arcade') tag = '<div class="badge-tag arcade">ARCADE</div>';
-                    else if (g.cat === 'sports') tag = '<div class="badge-tag sports">LIVE BET</div>';
-                    else if (g.cat === 'trending') tag = '<div class="badge-tag trending">🔥 TRENDING</div>';
-                    else if (g.cat === 'new') tag = '<div class="badge-tag new">🆕 NEW</div>';
-
-                    card.innerHTML = `
-                        ${tag}
-                        ${visualContent}
-                        <div class="play-overlay">
-                            <div class="play-btn">▶ PLAY</div>
-                        </div>
-                        <div class="card-info">
-                            <div class="game-title">${g.name}</div>
-                            <div class="game-sub">${g.provider}</div>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
-            });
-        }
-
         // FILTER FUNCTION
         function filterCategory(cat) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -4622,6 +4630,12 @@
         }
 
         // CRASH
+        let crashActive = false;
+        let crashMultiplier = 1.0;
+        let crashInterval = null;
+        let crashBetAmount = 0;
+        let crashCashedOut = false;
+
         function resetCrash() {
             crashActive = false;
             crashMultiplier = 1.0;
@@ -4702,6 +4716,504 @@
             updateDegenerateStats();
             saveState();
         }
+
+        // HI-LO
+        let hiloStreak = 0;
+        let hiloCurrentCard = null;
+        let hiloBetAmount = 1.0;
+        let hiloInProgress = false;
+
+        function launchHilo() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay open';
+            modal.id = 'hiloModal';
+            modal.innerHTML = `
+                <div class="modal-card enhanced" style="max-width:400px;">
+                    <div class="modal-header">
+                        <h3>🃏 Hi-Lo Challenge</h3>
+                        <span style="cursor:pointer;color:var(--text-muted);position:absolute;top:16px;right:20px;" onclick="document.getElementById('hiloModal').remove()">✕</span>
+                    </div>
+                    <div style="text-align:center;padding:20px 0;">
+                        <div style="font-size:4rem;margin-bottom:10px;" id="hiloCard">🃏</div>
+                        <div style="font-size:1.2rem;font-weight:900;color:var(--brand-gold);" id="hiloValue">? (1-13)</div>
+                        <div style="display:flex;gap:12px;justify-content:center;margin:16px 0;">
+                            <button class="btn btn-primary" onclick="playHilo('higher')">⬆ Higher</button>
+                            <button class="btn btn-red" onclick="playHilo('lower')">⬇ Lower</button>
+                        </div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">Current bet: $<span id="hiloBetDisplay">1.00</span></div>
+                        <div style="margin:8px 0;">
+                            <input type="number" id="hiloBetInput" value="1.00" min="0.10" step="0.5" style="width:100px;text-align:center;">
+                            <div class="quick-bets" style="justify-content:center;">
+                                <button class="btn" onclick="quickBet('hiloBetInput',25)">25%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',50)">50%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',75)">75%</button>
+                                <button class="btn" onclick="quickBet('hiloBetInput',100)">100%</button>
+                            </div>
+                            <button class="btn btn-green" onclick="startHiloRound()" style="margin-top:6px;">Start Round</button>
+                        </div>
+                        <div style="font-size:0.6rem;color:var(--text-muted);margin-top:8px;">
+                            Win streak: <span id="hiloStreakDisplay" style="color:var(--brand-green);font-weight:900;">0</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            hiloStreak = 0;
+            hiloCurrentCard = null;
+            hiloBetAmount = 1.0;
+            hiloInProgress = false;
+            generateHiloCard();
+        }
+
+        function generateHiloCard() {
+            const card = Math.floor(Math.random() * 13) + 1;
+            hiloCurrentCard = card;
+            document.getElementById('hiloValue').textContent = `${card} (1-13)`;
+            const suits = ['♠️', '♥️', '♦️', '♣️'];
+            document.getElementById('hiloCard').textContent = `${suits[Math.floor(Math.random() * suits.length)]}${card}`;
+        }
+
+        function startHiloRound() {
+            const bet = parseFloat(document.getElementById('hiloBetInput').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Insufficient balance or invalid bet', 'loss');
+                return;
+            }
+            hiloBetAmount = bet;
+            hiloInProgress = true;
+            document.getElementById('hiloBetDisplay').textContent = bet.toFixed(2);
+            generateHiloCard();
+            triggerToast('🎯 Guess Higher or Lower!', 'gold');
+        }
+
+        function playHilo(choice) {
+            if (!hiloInProgress) {
+                triggerToast('Start a round first!', 'loss');
+                return;
+            }
+
+            const current = hiloCurrentCard;
+            const next = Math.floor(Math.random() * 13) + 1;
+            const bet = hiloBetAmount;
+
+            document.getElementById('hiloCard').textContent = `🃏 → ${['♠️','♥️','♦️','♣️'][Math.floor(Math.random()*4)]}${next}`;
+            document.getElementById('hiloValue').textContent = `${current} → ${next}`;
+
+            let won = false;
+            if (choice === 'higher' && next > current) won = true;
+            if (choice === 'lower' && next < current) won = true;
+
+            if (won) {
+                const win = bet * 1.9;
+                userBalance += win;
+                hiloStreak++;
+                triggerToast(`✅ Correct! +$${win.toFixed(2)} (Streak: ${hiloStreak})`, 'win');
+                playSound('win');
+                fireConfetti(15);
+                addBetHistory('Hi-Lo', bet, win, true);
+                addTransaction('game_win', win, 'Hi-Lo win');
+                updateBalance();
+                updateUserWagered(bet);
+                document.getElementById('hiloStreakDisplay').textContent = hiloStreak;
+                hiloInProgress = false;
+                setTimeout(() => {
+                    if (document.getElementById('hiloModal')) {
+                        hiloBetAmount = bet;
+                        document.getElementById('hiloBetDisplay').textContent = bet.toFixed(2);
+                        hiloInProgress = true;
+                        generateHiloCard();
+                        triggerToast('🎯 Next round! Guess again!', 'gold');
+                    }
+                }, 1000);
+            } else {
+                triggerToast(`💔 Wrong! Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Hi-Lo', bet, 0, false);
+                hiloStreak = 0;
+                document.getElementById('hiloStreakDisplay').textContent = '0';
+                hiloInProgress = false;
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // TOWER
+        function launchTower() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const levels = 5 + Math.floor(Math.random() * 3);
+            let level = 1;
+            let multiplier = 1.0;
+
+            function climbTower() {
+                const risk = Math.random();
+                const win = risk > 0.15;
+                if (win) {
+                    multiplier += 0.3;
+                    const winAmt = bet * multiplier;
+                    triggerToast(`🏗️ Level ${level}/${levels}! ${multiplier.toFixed(1)}x (+$${winAmt.toFixed(2)})`, 'win');
+                    playSound('win');
+                    fireConfetti(8);
+                    if (level >= levels) {
+                        userBalance += winAmt;
+                        triggerToast(`🎉 Tower Complete! +$${winAmt.toFixed(2)}!`, 'win');
+                        playSound('jackpot');
+                        fireConfetti(40);
+                        addBetHistory('Tower', bet, winAmt, true);
+                        addTransaction('game_win', winAmt, 'Tower win');
+                        updateBalance();
+                        updateDegenerateStats();
+                        saveState();
+                        return;
+                    }
+                    level++;
+                    if (confirm(`Level ${level-1} won! Continue? (${multiplier.toFixed(1)}x currently)`)) {
+                        climbTower();
+                    } else {
+                        userBalance += bet * multiplier;
+                        triggerToast(`💰 Cashed out +$${(bet * multiplier).toFixed(2)}!`, 'win');
+                        addBetHistory('Tower', bet, bet * multiplier, true);
+                        updateBalance();
+                        updateDegenerateStats();
+                        saveState();
+                    }
+                } else {
+                    triggerToast(`💥 Crashed at level ${level}! Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Tower', bet, 0, false);
+                    updateDegenerateStats();
+                    saveState();
+                }
+            }
+
+            if (confirm(`Start Tower with $${bet.toFixed(2)}? ${levels} levels to complete.`)) {
+                climbTower();
+            }
+        }
+
+        // KENO
+        function launchKeno() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const picks = [];
+            while (picks.length < 3) {
+                const num = Math.floor(Math.random() * 40) + 1;
+                if (!picks.includes(num)) picks.push(num);
+            }
+
+            const drawn = [];
+            while (drawn.length < 10) {
+                const num = Math.floor(Math.random() * 40) + 1;
+                if (!drawn.includes(num)) drawn.push(num);
+            }
+
+            let matches = picks.filter(p => drawn.includes(p)).length;
+            let multipliers = { 0: 0, 1: 0.5, 2: 2, 3: 5 };
+            const mult = multipliers[matches] || 0;
+
+            if (mult > 0) {
+                const win = bet * mult;
+                userBalance += win;
+                triggerToast(`🎱 Keno! ${matches} matches! +$${win.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(20);
+                addBetHistory('Keno', bet, win, true);
+                addTransaction('game_win', win, 'Keno win');
+                if (matches >= 3) {
+                    addTopMultiplier(currentUser.name, win, mult);
+                }
+            } else {
+                triggerToast(`🎱 No matches. Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Keno', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // COIN FLIP
+        function launchCoinFlip() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const choice = confirm('Choose Heads? (OK=Heads, Cancel=Tails)');
+            const result = Math.random() > 0.5;
+            const win = (choice === result);
+
+            if (win) {
+                const winAmt = bet * 1.96;
+                userBalance += winAmt;
+                triggerToast(`🪙 ${result ? 'Heads' : 'Tails'}! +$${winAmt.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(15);
+                addBetHistory('CoinFlip', bet, winAmt, true);
+                addTransaction('game_win', winAmt, 'Coin Flip win');
+                addTopMultiplier(currentUser.name, winAmt, 1.96);
+            } else {
+                triggerToast(`💔 ${result ? 'Heads' : 'Tails'}! Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('CoinFlip', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // LIMBO
+        function launchLimbo() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const target = parseFloat(prompt('Target multiplier (1.5-10):', '2.0'));
+            if (isNaN(target) || target < 1.5 || target > 10) {
+                triggerToast('Invalid target', 'loss');
+                return;
+            }
+
+            const result = 1.0 + Math.random() * 9;
+            if (result >= target) {
+                const win = bet * target;
+                userBalance += win;
+                triggerToast(`⚡ ${result.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(20);
+                addBetHistory('Limbo', bet, win, true);
+                addTransaction('game_win', win, 'Limbo win');
+                addTopMultiplier(currentUser.name, win, target);
+            } else {
+                triggerToast(`💔 ${result.toFixed(2)}x - Below target! Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Limbo', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // PACHINKO
+        function launchPachinko() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const slots = [0.2, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 8.0];
+            const idx = Math.floor(Math.random() * slots.length);
+            const mult = slots[idx];
+
+            if (mult >= 1) {
+                const win = bet * mult;
+                userBalance += win;
+                triggerToast(`🔮 ${mult}x! +$${win.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(20);
+                addBetHistory('Pachinko', bet, win, true);
+                addTransaction('game_win', win, 'Pachinko win');
+                if (mult >= 3) addTopMultiplier(currentUser.name, win, mult);
+            } else {
+                triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('Pachinko', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // ROCK PAPER SCISSORS
+        function launchRPS() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) {
+                triggerToast('Invalid bet amount', 'loss');
+                return;
+            }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const choices = ['✊', '✋', '✌️'];
+            const playerChoice = prompt('Choose: (0=Rock, 1=Paper, 2=Scissors)');
+            const pIdx = parseInt(playerChoice);
+            if (isNaN(pIdx) || pIdx < 0 || pIdx > 2) {
+                triggerToast('Invalid choice', 'loss');
+                return;
+            }
+
+            const cIdx = Math.floor(Math.random() * 3);
+            let result = '';
+            let win = false;
+
+            if (pIdx === cIdx) result = 'Tie!';
+            else if ((pIdx === 0 && cIdx === 2) || (pIdx === 1 && cIdx === 0) || (pIdx === 2 && cIdx === 1)) {
+                result = 'Win!';
+                win = true;
+            } else {
+                result = 'Lose!';
+            }
+
+            if (win) {
+                const winAmt = bet * 1.95;
+                userBalance += winAmt;
+                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - ${result} +$${winAmt.toFixed(2)}`, 'win');
+                playSound('win');
+                fireConfetti(15);
+                addBetHistory('RPS', bet, winAmt, true);
+                addTransaction('game_win', winAmt, 'RPS win');
+            } else if (result === 'Tie!') {
+                userBalance += bet;
+                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - Tie! Bet returned.`, 'gold');
+                addBetHistory('RPS', bet, bet, true);
+            } else {
+                triggerToast(`✊ ${choices[pIdx]} vs ${choices[cIdx]} - ${result} Lost $${bet.toFixed(2)}`, 'loss');
+                playSound('loss');
+                addBetHistory('RPS', bet, 0, false);
+            }
+            updateBalance();
+            updateDegenerateStats();
+            saveState();
+        }
+
+        // WHEEL
+        function spinWheel() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('wheelBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            userBalance -= bet;
+            updateUserWagered(bet);
+            updateBalance();
+
+            const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
+            const weights = [20, 25, 20, 15, 10, 7, 3];
+            let totalWeight = weights.reduce((a, b) => a + b, 0);
+            let rand = Math.random() * totalWeight;
+            let selected = 0;
+            for (let i = 0; i < weights.length; i++) {
+                rand -= weights[i];
+                if (rand <= 0) { selected = i; break; }
+            }
+
+            const mult = multipliers[selected];
+            const win = bet * mult;
+            const wheel = document.getElementById('wheelSpin');
+
+            const spins = 5 + Math.random() * 5;
+            const degrees = spins * 360 + (selected / multipliers.length) * 360;
+            wheel.style.transform = `rotate(${degrees}deg)`;
+
+            document.getElementById('wheelResult').textContent = '🎡 Spinning...';
+
+            setTimeout(() => {
+                if (mult >= 1) {
+                    userBalance += win;
+                    triggerToast(`🎡 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
+                    playSound('win');
+                    if (mult >= 5) {
+                        fireConfetti(50);
+                        playSound('jackpot');
+                        addTopMultiplier(currentUser.name, win, mult);
+                    } else {
+                        fireConfetti(20);
+                    }
+                    addBetHistory('Wheel', bet, win, true);
+                    addTransaction('game_win', win, 'Wheel win');
+                    recordLiveBet('Wheel', currentUser.name, bet, mult, true);
+                } else {
+                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Wheel', bet, 0, false);
+                }
+                updateBalance();
+                document.getElementById('wheelResult').textContent = `🎯 ${mult}x! ${mult >= 1 ? '+$' + win.toFixed(2) : 'Lost $' + bet.toFixed(2)}`;
+                updateDegenerateStats();
+                saveState();
+            }, 4000);
+        }
+
+        // SEARCH
+        function handleSearch(val) {
+            const resultsContainer = document.getElementById('searchResults');
+            if (!val || val.length < 1) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+            const matches = gamesList.filter(g => g.name.toLowerCase().includes(val.toLowerCase()));
+            resultsContainer.style.display = 'flex';
+            resultsContainer.innerHTML = '';
+            if (matches.length === 0) {
+                resultsContainer.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:0.7rem;">No games found</div>';
+                return;
+            }
+            matches.slice(0, 8).forEach(m => {
+                const div = document.createElement('div');
+                div.style.cssText = 'padding:4px 8px;background:rgba(255,255,255,0.02);border-radius:4px;cursor:pointer;font-weight:700;font-size:0.7rem;transition:all 0.2s;';
+                div.textContent = `${m.icon || '🎮'} ${m.name}`;
+                div.onmouseenter = () => { div.style.background = 'rgba(255,255,255,0.05)'; };
+                div.onmouseleave = () => { div.style.background = 'rgba(255,255,255,0.02)'; };
+                div.onclick = () => {
+                    resultsContainer.style.display = 'none';
+                    document.getElementById('searchInput').value = '';
+                    launchGame(m.id);
+                };
+                resultsContainer.appendChild(div);
+            });
+        }
+
+        document.addEventListener('click', function(e) {
+            const searchInput = document.getElementById('searchInput');
+            const results = document.getElementById('searchResults');
+            if (e.target !== searchInput && !results.contains(e.target)) {
+                results.style.display = 'none';
+            }
+        });
 
         // ======================================================
         // INIT
