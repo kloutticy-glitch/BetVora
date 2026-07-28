@@ -1,131 +1,54 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const Database = require('better-sqlite3');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(helmet());
+// ==================== MIDDLEWARE ====================
 app.use(cors());
-app.use(morgan('dev'));
 app.use(express.json());
 
 console.log('🚀 Server starting...');
 
-// ==================== SQLITE DATABASE ====================
-const db = new sqlite3.Database('./betvora.db', (err) => {
-    if (err) {
-        console.error('❌ Database error:', err.message);
-    } else {
-        console.log('✅ SQLite database connected');
-    }
-});
+// ==================== DATABASE ====================
+const db = new Database('./betvora.db', { verbose: console.log });
 
-global.db = db;
+// Create tables
+db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        balance REAL DEFAULT 100,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+`);
 
-// ==================== CREATE TABLES ====================
-db.serialize(() => {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            balance REAL DEFAULT 0,
-            bonus_balance REAL DEFAULT 0,
-            total_wagered REAL DEFAULT 0,
-            total_won REAL DEFAULT 0,
-            degen_rank TEXT DEFAULT 'bronze',
-            win_streak INTEGER DEFAULT 0,
-            biggest_win REAL DEFAULT 0,
-            referral_code TEXT UNIQUE,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_active DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+db.exec(`
+    CREATE TABLE IF NOT EXISTS game_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id),
+        game_type TEXT NOT NULL,
+        bet_amount REAL NOT NULL,
+        win_amount REAL DEFAULT 0,
+        multiplier REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+`);
 
-    db.run(`
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER REFERENCES users(id),
-            type TEXT NOT NULL,
-            amount REAL NOT NULL,
-            balance_after REAL NOT NULL,
-            reference TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+console.log('✅ Database connected and tables created');
 
-    db.run(`
-        CREATE TABLE IF NOT EXISTS game_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER REFERENCES users(id),
-            game_type TEXT NOT NULL,
-            bet_amount REAL NOT NULL,
-            win_amount REAL DEFAULT 0,
-            multiplier REAL DEFAULT 0,
-            game_data TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+// ==================== AUTH ====================
 
-    console.log('✅ Tables created/verified');
-});
-
-// ==================== HELPER FUNCTIONS ====================
-function query(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-}
-
-function queryOne(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
-
-function run(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function(err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
-
-// ==================== ROUTES ====================
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Server is running with SQLite!' });
-});
-
-app.get('/api/test', (req, res) => {
-    res.json({ message: 'API is working! 🎉', database: 'SQLite' });
-});
-
-// ==================== AUTH ROUTES ====================
-
-// REGISTER
+// Register
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
-
-        console.log('📝 Registration attempt:', { username, email });
 
         if (!username || !email || !password) {
             return res.status(400).json({ error: 'All fields required' });
@@ -135,33 +58,22 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        // Check if user exists
-        const existing = await queryOne(
-            'SELECT * FROM users WHERE email = ? OR username = ?',
-            [email, username]
-        );
+        const existing = db.prepare('SELECT * FROM users WHERE email = ? OR username = ?').get(email, username);
 
         if (existing) {
             return res.status(400).json({ error: 'User already exists' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const referralCode = username.slice(0, 4) + Math.random().toString(36).slice(2, 6);
+        const result = db.prepare(
+            'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
+        ).run(username, email, hashedPassword);
 
-        const result = await run(
-            `INSERT INTO users (username, email, password_hash, referral_code)
-             VALUES (?, ?, ?, ?)`,
-            [username, email, hashedPassword, referralCode]
-        );
-
-        const user = await queryOne(
-            'SELECT id, username, email, balance FROM users WHERE id = ?',
-            [result.lastID]
-        );
+        const user = db.prepare('SELECT id, username, email, balance FROM users WHERE id = ?').get(result.lastInsertRowid);
 
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'secret123',
             { expiresIn: '7d' }
         );
 
@@ -172,23 +84,16 @@ app.post('/api/auth/register', async (req, res) => {
         });
     } catch (error) {
         console.error('Register error:', error);
-        res.status(500).json({ error: 'Registration failed: ' + error.message });
+        res.status(500).json({ error: 'Registration failed' });
     }
 });
 
-// LOGIN
+// Login
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password required' });
-        }
-
-        const user = await queryOne(
-            'SELECT * FROM users WHERE email = ?',
-            [email]
-        );
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -201,7 +106,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'secret123',
             { expiresIn: '7d' }
         );
 
@@ -216,12 +121,12 @@ app.post('/api/auth/login', async (req, res) => {
             token
         });
     } catch (error) {
-        console.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
     }
 });
 
-// ==================== AUTH MIDDLEWARE ====================
+// ==================== GAMES ====================
+
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -230,7 +135,7 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, process.env.JWT_SECRET || 'secret123', (err, decoded) => {
         if (err) {
             return res.status(403).json({ error: 'Invalid token' });
         }
@@ -239,7 +144,6 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// ==================== PLINKO GAME ====================
 app.post('/api/games/plinko', authenticateToken, async (req, res) => {
     try {
         const { bet } = req.body;
@@ -249,10 +153,7 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Minimum bet is $0.10' });
         }
 
-        const user = await queryOne(
-            'SELECT balance FROM users WHERE id = ?',
-            [userId]
-        );
+        const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -262,10 +163,7 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Insufficient balance' });
         }
 
-        await run(
-            'UPDATE users SET balance = balance - ? WHERE id = ?',
-            [bet, userId]
-        );
+        db.prepare('UPDATE users SET balance = balance - ? WHERE id = ?').run(bet, userId);
 
         const multipliers = [0.5, 1.2, 5.0, 1.2, 0.5];
         const mult = multipliers[Math.floor(Math.random() * multipliers.length)];
@@ -273,16 +171,10 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
         const isWin = mult >= 1;
 
         if (isWin) {
-            await run(
-                'UPDATE users SET balance = balance + ? WHERE id = ?',
-                [winAmount, userId]
-            );
+            db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(winAmount, userId);
         }
 
-        const updated = await queryOne(
-            'SELECT balance FROM users WHERE id = ?',
-            [userId]
-        );
+        const updated = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
 
         res.json({
             success: true,
@@ -295,35 +187,37 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Plinko error:', error);
-        res.status(500).json({ error: 'Game failed: ' + error.message });
+        res.status(500).json({ error: 'Game failed' });
     }
 });
 
-// ==================== WALLET ====================
-app.get('/api/wallet/balance', authenticateToken, async (req, res) => {
+app.get('/api/wallet/balance', authenticateToken, (req, res) => {
     try {
-        const user = await queryOne(
-            'SELECT balance, bonus_balance FROM users WHERE id = ?',
-            [req.user.id]
-        );
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        res.json({
-            balance: user.balance,
-            bonusBalance: user.bonus_balance || 0
-        });
+        const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(req.user.id);
+        res.json({ balance: user.balance });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
 
-// ==================== START SERVER ====================
+app.get('/api/test', (req, res) => {
+    res.json({
+        message: 'API is working! 🎉',
+        status: 'Connected to SQLite on Render!',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'BetVora API is running! 🚀',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-    console.log(`🗄️  Database: SQLite (betvora.db)`);
+    console.log(`✅ Server running on port ${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/test`);
-    console.log(`📝 Register: POST /api/auth/register`);
 });
