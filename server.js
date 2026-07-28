@@ -129,15 +129,40 @@ function authenticateToken(req, res, next) {
 // ==================== BETNEX GAME PROVIDER ====================
 const betnex = new Betnex(process.env.BETNEX_API_KEY || 'test-key', { debug: false });
 
-// Get games list
+// Get games list - FIXED
 app.get('/api/provider/games', authenticateToken, async (req, res) => {
     try {
         console.log('📡 Fetching Betnex games...');
         const providers = await betnex.getProviders();
         console.log('✅ Providers:', providers);
-        const games = await betnex.getGames(providers[0]);
-        console.log('✅ Games loaded:', games.length);
-        res.json({ success: true, providers, games });
+        
+        // Check if providers array is valid
+        if (!providers || providers.length === 0) {
+            return res.status(400).json({ error: 'No providers available. Check your API key.' });
+        }
+        
+        // Try each provider until we find games
+        let games = [];
+        let usedProvider = null;
+        for (const provider of providers) {
+            try {
+                console.log(`🔍 Trying provider: ${provider}`);
+                games = await betnex.getGames(provider);
+                if (games && games.length > 0) {
+                    usedProvider = provider;
+                    console.log(`✅ Found ${games.length} games from ${provider}`);
+                    break;
+                }
+            } catch (e) {
+                console.log(`❌ No games from ${provider}:`, e.message);
+            }
+        }
+        
+        if (games.length === 0) {
+            console.log('⚠️ No games found from any provider');
+        }
+        
+        res.json({ success: true, providers, games, usedProvider });
     } catch (error) {
         console.error('❌ Betnex games error:', error.message);
         res.status(500).json({ error: error.message });
