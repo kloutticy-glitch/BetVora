@@ -2880,17 +2880,23 @@
         }
 
         // ======================================================
-        // 4. BETNEX GAME FUNCTIONS
+        // 4. BETNEX GAME FUNCTIONS - FIXED
         // ======================================================
 
-        // Load games from Betnex
+        // Load games from Betnex - FIXED
         async function loadBetnexGames() {
             try {
+                console.log('🔄 Loading Betnex games...');
                 const response = await apiCall('/provider/games');
+                console.log('📦 Response:', response);
+                
                 const games = response.games || [];
                 const container = document.getElementById('betnexGamesContainer');
                 
-                if (!container) return;
+                if (!container) {
+                    console.error('❌ betnexGamesContainer not found!');
+                    return;
+                }
                 
                 if (games.length === 0) {
                     container.innerHTML = '<p style="color:var(--text-muted);">No games available. Add your Betnex API key!</p>';
@@ -2921,8 +2927,10 @@
                     `;
                     container.appendChild(card);
                 });
+                
+                console.log(`✅ Loaded ${games.length} games!`);
             } catch (error) {
-                console.error('Failed to load games:', error);
+                console.error('❌ Failed to load games:', error);
                 const container = document.getElementById('betnexGamesContainer');
                 if (container) {
                     container.innerHTML = '<p style="color:var(--text-muted);">Failed to load games. Make sure Betnex is configured.</p>';
@@ -2998,7 +3006,7 @@
         }
 
         // ======================================================
-        // 6. RENDER CATALOG - FIXED
+        // 6. RENDER CATALOG
         // ======================================================
 
         function renderCatalog(filter = 'all') {
@@ -3572,6 +3580,10 @@
             saveState();
         }
 
+        // ======================================================
+        // 9. UPDATE BONUS UI - FIXED
+        // ======================================================
+
         function updateBonusUI() {
             const tier = getCurrentTier();
             const bar = document.getElementById('bonusProgressBar');
@@ -3585,14 +3597,16 @@
             const claimedText = document.getElementById('bonusClaimedText');
 
             if (!tier) {
-                label.textContent = '🏆 All Complete!';
-                badge.textContent = 'Max Level';
-                fill.style.width = '100%';
-                infoText.innerHTML = '🎉 You\'ve completed all bonus tiers!';
-                claimBtn.style.display = 'none';
-                claimedText.style.display = 'inline-block';
-                claimedText.textContent = '🏆 MAXED OUT!';
-                bar.classList.add('completed');
+                if (label) label.textContent = '🏆 All Complete!';
+                if (badge) badge.textContent = 'Max Level';
+                if (fill) fill.style.width = '100%';
+                if (infoText) infoText.innerHTML = '🎉 You\'ve completed all bonus tiers!';
+                if (claimBtn) claimBtn.style.display = 'none';
+                if (claimedText) {
+                    claimedText.style.display = 'inline-block';
+                    claimedText.textContent = '🏆 MAXED OUT!';
+                }
+                if (bar) bar.classList.add('completed');
                 return;
             }
 
@@ -3600,33 +3614,43 @@
             const isComplete = currentUser.bonusProgress >= tier.wager;
             const isClaimed = currentUser.completedTiers.includes(tier.id);
 
-            label.textContent = `${tier.icon} ${tier.label}`;
-            badge.textContent = `$${tier.wager} → $${tier.reward}`;
-            fill.style.width = progress + '%';
-            targetEl.textContent = '$' + tier.wager;
-            rewardEl.textContent = '$' + tier.reward;
+            if (label) label.textContent = `${tier.icon} ${tier.label}`;
+            if (badge) badge.textContent = `$${tier.wager} → $${tier.reward}`;
+            if (fill) fill.style.width = progress + '%';
+            if (targetEl) targetEl.textContent = '$' + tier.wager;
+            if (rewardEl) rewardEl.textContent = '$' + tier.reward;
 
             if (isClaimed) {
-                bar.classList.add('completed');
-                claimBtn.style.display = 'none';
-                claimedText.style.display = 'inline-block';
-                claimedText.textContent = '✅ Claimed!';
+                if (bar) bar.classList.add('completed');
+                if (claimBtn) claimBtn.style.display = 'none';
+                if (claimedText) {
+                    claimedText.style.display = 'inline-block';
+                    claimedText.textContent = '✅ Claimed!';
+                }
                 const next = getNextTier();
-                infoText.innerHTML =
-                    `🎯 <span class="highlight">${tier.label}</span> completed! ${next ? 'Next: $' + next.wager + ' → $' + next.reward : '🎉 All done!'}`;
+                if (infoText) {
+                    infoText.innerHTML =
+                        `🎯 <span class="highlight">${tier.label}</span> completed! ${next ? 'Next: $' + next.wager + ' → $' + next.reward : '🎉 All done!'}`;
+                }
             } else if (isComplete) {
-                bar.classList.add('completed');
-                claimBtn.style.display = 'inline-flex';
-                claimBtn.disabled = false;
-                claimedText.style.display = 'none';
-                infoText.innerHTML = `🎯 <span class="highlight">${tier.label}</span> ready to claim! Click Claim!`;
+                if (bar) bar.classList.add('completed');
+                if (claimBtn) {
+                    claimBtn.style.display = 'inline-flex';
+                    claimBtn.disabled = false;
+                }
+                if (claimedText) claimedText.style.display = 'none';
+                if (infoText) infoText.innerHTML = `🎯 <span class="highlight">${tier.label}</span> ready to claim! Click Claim!`;
             } else {
-                bar.classList.remove('completed');
-                claimBtn.style.display = 'inline-flex';
-                claimBtn.disabled = true;
-                claimedText.style.display = 'none';
-                infoText.innerHTML =
-                    `Wager <span class="highlight">$${tier.wager}</span> to unlock <span class="highlight-gold">$${tier.reward}</span> bonus`;
+                if (bar) bar.classList.remove('completed');
+                if (claimBtn) {
+                    claimBtn.style.display = 'inline-flex';
+                    claimBtn.disabled = true;
+                }
+                if (claimedText) claimedText.style.display = 'none';
+                if (infoText) {
+                    infoText.innerHTML =
+                        `Wager <span class="highlight">$${tier.wager}</span> to unlock <span class="highlight-gold">$${tier.reward}</span> bonus`;
+                }
             }
         }
 
