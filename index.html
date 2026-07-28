@@ -496,8 +496,8 @@
         /* ======================== GAME CARD - PORTRAIT ======================== */
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 14px;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
         }
 
         .game-thumb-card {
@@ -1084,242 +1084,106 @@
             text-shadow: 0 0 20px var(--brand-green-glow);
         }
 
-        .section-block {
-            margin-bottom: 28px;
-        }
-        .section-heading {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .section-title-text {
-            font-family: 'Syne', sans-serif;
-            font-size: 1rem;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .see-all-link {
-            font-size: 0.65rem;
-            font-weight: 800;
-            color: var(--brand-green);
-            cursor: pointer;
-        }
-        .see-all-link:hover {
-            text-decoration: underline;
-        }
-
-        /* ======================== GAME STAGES ======================== */
-        .game-stage-modal {
+        /* ======================== BETNEX GAME CARD (NEW) ======================== */
+        .betnex-game-card {
             background: var(--bg-card);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            margin-bottom: 24px;
-            display: none;
-            animation: modalSlide 0.3s ease;
-        }
-        @keyframes modalSlide {
-            from {
-                opacity: 0;
-                transform: translateY(-20px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-        .game-stage-modal.active {
-            display: block;
-        }
-
-        .plinko-board {
-            background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 16px;
-            text-align: center;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            width: 180px;
+            flex-shrink: 0;
         }
-        .plinko-slots {
+        .betnex-game-card:hover {
+            transform: translateY(-6px) scale(1.03);
+            border-color: var(--brand-green);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 230, 153, 0.1);
+        }
+        .betnex-game-card .game-thumb {
+            height: 120px;
+            background: var(--panel);
             display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 4px;
-            margin-top: 12px;
+            font-size: 3rem;
+            position: relative;
         }
-        .plinko-mult {
-            background: var(--brand-purple);
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 6px;
+        .betnex-game-card .game-thumb .provider-badge {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.4rem;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+        .betnex-game-card .game-info {
+            padding: 10px 12px;
+        }
+        .betnex-game-card .game-info .game-name {
+            font-size: 0.7rem;
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .betnex-game-card .game-info .game-provider {
+            font-size: 0.5rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 2px;
+        }
+        .betnex-game-card .play-btn-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            backdrop-filter: blur(4px);
+        }
+        .betnex-game-card:hover .play-btn-overlay {
+            opacity: 1;
+        }
+        .betnex-game-card .play-btn-overlay .play-btn {
+            background: var(--brand-green);
+            color: #000;
+            padding: 6px 18px;
+            border-radius: 30px;
             font-weight: 900;
             font-size: 0.6rem;
-            flex: 1;
-            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .betnex-game-card:hover .play-btn-overlay .play-btn {
+            transform: scale(1);
         }
 
-        .mines-layout {
-            display: grid;
-            grid-template-columns: 200px 1fr;
-            gap: 16px;
-        }
-        .mines-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 5px;
-            max-width: 300px;
-            margin: 0 auto;
-        }
-        .mine-tile {
-            aspect-ratio: 1;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
+        .betnex-games-scroll {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.2s;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 4px 0 12px;
+            scroll-behavior: smooth;
         }
-        .mine-tile:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--brand-green);
+        .betnex-games-scroll::-webkit-scrollbar {
+            height: 4px;
         }
-        .mine-tile.revealed-gem {
-            background: rgba(0, 230, 153, 0.15);
-            border-color: var(--brand-green);
-        }
-        .mine-tile.revealed-bomb {
-            background: rgba(239, 68, 68, 0.2);
-            border-color: #ef4444;
-        }
-
-        .slot-arena {
-            text-align: center;
-            max-width: 380px;
-            margin: 0 auto;
-        }
-        .reels-box {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            background: var(--panel);
-            padding: 12px;
-            border-radius: 10px;
-            margin: 12px 0;
-            border: 1px solid var(--border);
-        }
-        .reel {
-            width: 60px;
-            height: 70px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-        }
-
-        .dice-slider-container {
-            background: var(--panel);
-            padding: 16px;
-            border-radius: 10px;
-            margin: 12px 0;
-            border: 1px solid var(--border);
-            text-align: center;
-        }
-
-        .crash-game-container {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            max-width: 450px;
-            margin: 0 auto;
-        }
-        .crash-graph {
-            height: 150px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            margin-bottom: 12px;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-        }
-        .crash-multiplier-display {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 2rem;
-            font-weight: 900;
-            color: var(--brand-green);
-            text-shadow: 0 0 40px var(--brand-green-glow);
-        }
-        .crash-multiplier-display.crashed {
-            color: var(--brand-red);
-            text-shadow: 0 0 40px rgba(204, 0, 0, 0.4);
-        }
-        .crash-bar {
-            width: 100%;
-            height: 12px;
-            background: rgba(255, 255, 255, 0.05);
+        .betnex-games-scroll::-webkit-scrollbar-thumb {
+            background: var(--brand-green);
             border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
         }
-        .crash-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--brand-green), var(--brand-gold));
+        .betnex-games-scroll::-webkit-scrollbar-track {
+            background: var(--border);
             border-radius: 4px;
-            transition: width 0.1s linear;
-            width: 0%;
-        }
-
-        .wheel-container {
-            text-align: center;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-        .wheel-spin {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            border: 4px solid var(--brand-gold);
-            margin: 12px auto;
-            position: relative;
-            overflow: hidden;
-            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-            background: conic-gradient(#ff6b6b 0% 12.5%, #ffd93d 12.5% 25%, #6bcb77 25% 37.5%, #4d96ff 37.5% 50%, #ff6b6b 50% 62.5%, #ffd93d 62.5% 75%, #6bcb77 75% 87.5%, #4d96ff 87.5% 100%);
-        }
-        .wheel-spin .pointer {
-            position: absolute;
-            top: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-top: 16px solid var(--brand-gold);
-            z-index: 2;
-        }
-        .wheel-result-display {
-            font-size: 1.2rem;
-            font-weight: 900;
-            margin-top: 10px;
-            color: var(--brand-gold);
         }
 
         /* ======================== QUICK BET BUTTONS ======================== */
@@ -1984,7 +1848,7 @@
                 width: 140px;
             }
             .games-grid {
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             }
             .mines-layout {
                 grid-template-columns: 1fr;
@@ -1992,6 +1856,9 @@
             .wheel-spin {
                 width: 180px;
                 height: 180px;
+            }
+            .betnex-game-card {
+                width: 150px;
             }
         }
 
@@ -2131,6 +1998,9 @@
                 min-width: 60px;
                 max-width: 100px;
             }
+            .betnex-game-card {
+                width: 130px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -2171,6 +2041,13 @@
             }
             .bonus-tier-card .tier-progress {
                 display: none;
+            }
+            .betnex-game-card {
+                width: 110px;
+            }
+            .betnex-game-card .game-thumb {
+                height: 80px;
+                font-size: 2rem;
             }
         }
     </style>
@@ -2899,32 +2776,45 @@
                 }
                 
                 if (games.length === 0) {
-                    container.innerHTML = '<p style="color:var(--text-muted);">No games available. Add your Betnex API key!</p>';
+                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">No games available. Add your Betnex API key!</p>';
                     return;
                 }
                 
                 container.innerHTML = '';
-                games.slice(0, 12).forEach(game => {
+                // Show ALL games in a scrollable horizontal row
+                games.forEach(game => {
                     const card = document.createElement('div');
-                    card.style.cssText = `
-                        background: var(--bg-card);
-                        border: 1px solid var(--border);
-                        border-radius: 10px;
-                        padding: 15px;
-                        width: 150px;
-                        text-align: center;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                    `;
-                    card.onmouseenter = () => { card.style.transform = 'scale(1.05)'; card.style.borderColor = 'var(--brand-green)'; };
-                    card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.borderColor = 'var(--border)'; };
+                    card.className = 'betnex-game-card';
+                    
+                    // Get game icon/emoji based on provider
+                    let icon = '🎰';
+                    const provider = (game.provider || '').toLowerCase();
+                    if (provider.includes('pragmatic')) icon = '🎰';
+                    else if (provider.includes('hacksaw')) icon = '⚔️';
+                    else if (provider.includes('spribe')) icon = '🪙';
+                    else if (provider.includes('evolution')) icon = '🎡';
+                    else if (provider.includes('playngo')) icon = '🎮';
+                    else if (provider.includes('netent')) icon = '🌐';
+                    else if (game.name && game.name.toLowerCase().includes('plinko')) icon = '🟢';
+                    else if (game.name && game.name.toLowerCase().includes('mines')) icon = '💣';
+                    else if (game.name && game.name.toLowerCase().includes('crash')) icon = '🚀';
+                    else if (game.name && game.name.toLowerCase().includes('dice')) icon = '🎲';
                     
                     card.innerHTML = `
-                        <div style="font-size:2rem; margin-bottom:5px;">🎰</div>
-                        <div style="font-size:0.7rem; font-weight:700;">${game.name || 'Game'}</div>
-                        <div style="font-size:0.5rem; color:var(--text-muted);">${game.provider || ''}</div>
-                        <button class="btn btn-green" style="margin-top:8px; width:100%; justify-content:center; font-size:0.6rem;" onclick="launchBetnexGame('${game.id}')">Play</button>
+                        <div class="game-thumb">
+                            <div style="font-size:2.5rem;">${icon}</div>
+                            <span class="provider-badge">${game.provider || 'BetVora'}</span>
+                        </div>
+                        <div class="game-info">
+                            <div class="game-name">${game.name || 'Game'}</div>
+                            <div class="game-provider">${game.provider || 'BetVora'}</div>
+                        </div>
+                        <div class="play-btn-overlay">
+                            <div class="play-btn" onclick="event.stopPropagation(); launchBetnexGame('${game.id}')">▶ PLAY</div>
+                        </div>
                     `;
+                    
+                    card.onclick = () => launchBetnexGame(game.id);
                     container.appendChild(card);
                 });
                 
@@ -2933,7 +2823,7 @@
                 console.error('❌ Failed to load games:', error);
                 const container = document.getElementById('betnexGamesContainer');
                 if (container) {
-                    container.innerHTML = '<p style="color:var(--text-muted);">Failed to load games. Make sure Betnex is configured.</p>';
+                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">Failed to load games. Make sure Betnex is configured.</p>';
                 }
             }
         }
@@ -2944,12 +2834,35 @@
                 const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
                 if (!bet || bet <= 0) return;
                 
+                // Check if user has enough balance
+                if (bet > userBalance) {
+                    triggerToast('Insufficient balance', 'loss');
+                    return;
+                }
+                
                 const response = await apiCall('/provider/launch', {
                     method: 'POST',
                     body: JSON.stringify({ gameId, bet })
                 });
                 
-                // Open game in new window
+                // If it's a demo game, update balance directly
+                if (response.isDemo) {
+                    userBalance = response.newBalance;
+                    updateBalance();
+                    if (response.result.isWin) {
+                        triggerToast(`🎰 ${response.result.multiplier}x! +$${response.result.winAmount.toFixed(2)}`, 'win');
+                        playSound('win');
+                        fireConfetti(20);
+                        addBetHistory('Demo', bet, response.result.winAmount, true);
+                    } else {
+                        triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
+                        playSound('loss');
+                        addBetHistory('Demo', bet, 0, false);
+                    }
+                    return;
+                }
+                
+                // Open real game in new window
                 window.open(response.gameUrl, '_blank');
                 
             } catch (error) {
@@ -3084,15 +2997,16 @@
                 });
             });
 
-            // Add Betnex games container at the bottom
+            // Add Betnex games container at the bottom with scrollable horizontal layout
             const betnexBlock = document.createElement('div');
             betnexBlock.className = 'section-block';
             betnexBlock.innerHTML = `
                 <div class="section-heading">
                     <div class="section-title-text">🎰 Casino Games</div>
+                    <span style="font-size:0.5rem;color:var(--text-muted);">⬅️ Scroll to see all games ➡️</span>
                 </div>
-                <div id="betnexGamesContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
-                    <p style="color:var(--text-muted);">Loading games...</p>
+                <div id="betnexGamesContainer" class="betnex-games-scroll">
+                    <p style="color:var(--text-muted);padding:20px;width:100%;text-align:center;">Loading games...</p>
                 </div>
             `;
             container.appendChild(betnexBlock);
