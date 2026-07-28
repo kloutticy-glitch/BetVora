@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const Database = require('better-sqlite3');
 require('dotenv').config();
 
 const app = express();
@@ -14,34 +13,13 @@ app.use(express.json());
 
 console.log('🚀 Server starting...');
 
-// ==================== DATABASE ====================
-const db = new Database('./betvora.db', { verbose: console.log });
-
-// Create tables
-db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        balance REAL DEFAULT 100,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-db.exec(`
-    CREATE TABLE IF NOT EXISTS game_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER REFERENCES users(id),
-        game_type TEXT NOT NULL,
-        bet_amount REAL NOT NULL,
-        win_amount REAL DEFAULT 0,
-        multiplier REAL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-console.log('✅ Database connected and tables created');
+// ==================== IN-MEMORY DATABASE ====================
+// This stores everything in memory (data resets when server restarts)
+const db = {
+    users: [],
+    games: [],
+    nextUserId: 1
+};
 
 // ==================== AUTH ====================
 
@@ -58,18 +36,22 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        const existing = db.prepare('SELECT * FROM users WHERE email = ? OR username = ?').get(email, username);
-
+        // Check if user exists
+        const existing = db.users.find(u => u.email === email || u.username === username);
         if (existing) {
             return res.status(400).json({ error: 'User already exists' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const result = db.prepare(
-            'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
-        ).run(username, email, hashedPassword);
-
-        const user = db.prepare('SELECT id, username, email, balance FROM users WHERE id = ?').get(result.lastInsertRowid);
+        const user = {
+            id: db.nextUserId++,
+            username,
+            email,
+            password_hash: hashedPassword,
+            balance: 100.00,
+            created_at: new Date().toISOString()
+        };
+        db.users.push(user);
 
         const token = jwt.sign(
             { id: user.id, username: user.username },
@@ -79,7 +61,12 @@ app.post('/api/auth/register', async (req, res) => {
 
         res.status(201).json({
             success: true,
-            user,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                balance: user.balance
+            },
             token
         });
     } catch (error) {
@@ -93,8 +80,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-
+        const user = db.users.find(u => u.email === email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -125,8 +111,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// ==================== GAMES ====================
-
+// ==================== AUTH MIDDLEWARE ====================
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -144,6 +129,9 @@ function authenticateToken(req, res, next) {
     });
 }
 
+// ==================== GAMES ====================
+
+// Plinko
 app.post('/api/games/plinko', authenticateToken, async (req, res) => {
     try {
         const { bet } = req.body;
@@ -153,8 +141,7 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Minimum bet is $0.10' });
         }
 
-        const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
-
+        const user = db.users.find(u => u.id === userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -163,7 +150,7 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Insufficient balance' });
         }
 
-        db.prepare('UPDATE users SET balance = balance - ? WHERE id = ?').run(bet, userId);
+        user.balance -= bet;
 
         const multipliers = [0.5, 1.2, 5.0, 1.2, 0.5];
         const mult = multipliers[Math.floor(Math.random() * multipliers.length)];
@@ -171,10 +158,18 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
         const isWin = mult >= 1;
 
         if (isWin) {
-            db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(winAmount, userId);
+            user.balance += winAmount;
         }
 
-        const updated = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
+        // Save game
+        db.games.push({
+            user_id: userId,
+            game_type: 'plinko',
+            bet_amount: bet,
+            win_amount: isWin ? winAmount : 0,
+            multiplier: mult,
+            created_at: new Date().toISOString()
+        });
 
         res.json({
             success: true,
@@ -183,7 +178,7 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
                 winAmount: isWin ? winAmount : 0,
                 isWin
             },
-            newBalance: updated.balance
+            newBalance: user.balance
         });
     } catch (error) {
         console.error('Plinko error:', error);
@@ -191,19 +186,25 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
     }
 });
 
+// Get Balance
 app.get('/api/wallet/balance', authenticateToken, (req, res) => {
     try {
-        const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(req.user.id);
+        const user = db.users.find(u => u.id === req.user.id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
         res.json({ balance: user.balance });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
 
+// Test
 app.get('/api/test', (req, res) => {
     res.json({
         message: 'API is working! 🎉',
-        status: 'Connected to SQLite on Render!',
+        status: 'Ready to use!',
+        users: db.users.length,
         timestamp: new Date().toISOString()
     });
 });
@@ -220,4 +221,5 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/test`);
+    console.log(`💾 Memory database ready (data resets on restart)`);
 });
