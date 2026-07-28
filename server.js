@@ -1,32 +1,205 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { Betnex } = require('@betnex/sdk');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ==================== MIDDLEWARE ====================
+// Middleware
+app.use(helmet());
 app.use(cors());
+app.use(morgan('dev'));
 app.use(express.json());
 
 console.log('🚀 Server starting...');
 
-// ==================== IN-MEMORY DATABASE ====================
-// This stores everything in memory (data resets when server restarts)
-const db = {
-    users: [],
-    games: [],
-    nextUserId: 1
-};
+// ==================== SQLITE DATABASE ====================
+const db = new sqlite3.Database('./betvora.db', (err) => {
+    if (err) {
+        console.error('❌ Database error:', err.message);
+    } else {
+        console.log('✅ SQLite database connected');
+    }
+});
 
-// ==================== AUTH ====================
+global.db = db;
 
-// Register
+// ==================== CREATE TABLES ====================
+db.serialize(() => {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            balance REAL DEFAULT 0,
+            bonus_balance REAL DEFAULT 0,
+            total_wagered REAL DEFAULT 0,
+            total_won REAL DEFAULT 0,
+            degen_rank TEXT DEFAULT 'bronze',
+            win_streak INTEGER DEFAULT 0,
+            biggest_win REAL DEFAULT 0,
+            referral_code TEXT UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_active DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            balance_after REAL NOT NULL,
+            reference TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS game_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            game_type TEXT NOT NULL,
+            bet_amount REAL NOT NULL,
+            win_amount REAL DEFAULT 0,
+            multiplier REAL DEFAULT 0,
+            game_data TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    console.log('✅ Tables created/verified');
+});
+
+// ==================== HELPER FUNCTIONS ====================
+function query(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+}
+
+function queryOne(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
+}
+
+function run(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function(err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
+    });
+}
+
+// ==================== BETNEX GAME PROVIDER ====================
+const betnex = new Betnex(process.env.BETNEX_API_KEY || 'test-key', { debug: false });
+
+// Get games list
+app.get('/api/provider/games', authenticateToken, async (req, res) => {
+    try {
+        const providers = await betnex.getProviders();
+        const games = await betnex.getGames(providers[0]);
+        res.json({ success: true, providers, games });
+    } catch (error) {
+        console.error('Betnex games error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Launch a game
+app.post('/api/provider/launch', authenticateToken, async (req, res) => {
+    try {
+        const { gameId, bet } = req.body;
+        const userId = req.user.id;
+
+        const user = await queryOne('SELECT balance FROM users WHERE id = ?', [userId]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        if (bet > user.balance) {
+            return res.status(400).json({ error: 'Insufficient balance' });
+        }
+
+        await run('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId]);
+
+        const launch = await betnex.launchGame({
+            username: userId.toString(),
+            gameId: gameId,
+            money: Math.round(bet * 100),
+            platform: 1,
+            currency: "USD",
+            home_url: "https://betvora.com",
+            lang: "en",
+        });
+
+        res.json({ success: true, gameUrl: launch.payload.game_launch_url });
+    } catch (error) {
+        console.error('Launch game error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Webhook for game results
+app.post('/api/webhook/betnex', async (req, res) => {
+    try {
+        const { username, serial_number, amount } = req.body;
+
+        const existing = await queryOne('SELECT * FROM transactions WHERE reference = ?', [serial_number]);
+        if (existing) {
+            return res.json({ success: true });
+        }
+
+        const amountInDollars = amount / 100;
+        await run('UPDATE users SET balance = balance + ? WHERE id = ?', [amountInDollars, parseInt(username)]);
+
+        await run(
+            'INSERT INTO transactions (user_id, type, amount, reference, status) VALUES (?, ?, ?, ?, ?)',
+            [parseInt(username), 'game', amountInDollars, serial_number, 'completed']
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Webhook error:', error.message);
+        res.status(500).json({ success: false });
+    }
+});
+
+// ==================== ROUTES ====================
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', message: 'Server is running with SQLite!' });
+});
+
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'API is working! 🎉', database: 'SQLite' });
+});
+
+// ==================== AUTH ROUTES ====================
+
+// REGISTER
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
+
+        console.log('📝 Registration attempt:', { username, email });
 
         if (!username || !email || !password) {
             return res.status(400).json({ error: 'All fields required' });
@@ -37,50 +210,60 @@ app.post('/api/auth/register', async (req, res) => {
         }
 
         // Check if user exists
-        const existing = db.users.find(u => u.email === email || u.username === username);
+        const existing = await queryOne(
+            'SELECT * FROM users WHERE email = ? OR username = ?',
+            [email, username]
+        );
+
         if (existing) {
             return res.status(400).json({ error: 'User already exists' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = {
-            id: db.nextUserId++,
-            username,
-            email,
-            password_hash: hashedPassword,
-            balance: 100.00,
-            created_at: new Date().toISOString()
-        };
-        db.users.push(user);
+        const referralCode = username.slice(0, 4) + Math.random().toString(36).slice(2, 6);
+
+        const result = await run(
+            `INSERT INTO users (username, email, password_hash, referral_code)
+             VALUES (?, ?, ?, ?)`,
+            [username, email, hashedPassword, referralCode]
+        );
+
+        const user = await queryOne(
+            'SELECT id, username, email, balance FROM users WHERE id = ?',
+            [result.lastID]
+        );
 
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.JWT_SECRET || 'secret123',
+            process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
         res.status(201).json({
             success: true,
-            user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                balance: user.balance
-            },
+            user,
             token
         });
     } catch (error) {
         console.error('Register error:', error);
-        res.status(500).json({ error: 'Registration failed' });
+        res.status(500).json({ error: 'Registration failed: ' + error.message });
     }
 });
 
-// Login
+// LOGIN
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = db.users.find(u => u.email === email);
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
+        }
+
+        const user = await queryOne(
+            'SELECT * FROM users WHERE email = ?',
+            [email]
+        );
+
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -92,7 +275,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         const token = jwt.sign(
             { id: user.id, username: user.username },
-            process.env.JWT_SECRET || 'secret123',
+            process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
@@ -107,6 +290,7 @@ app.post('/api/auth/login', async (req, res) => {
             token
         });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
     }
 });
@@ -120,7 +304,7 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'secret123', (err, decoded) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
             return res.status(403).json({ error: 'Invalid token' });
         }
@@ -129,9 +313,7 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// ==================== GAMES ====================
-
-// Plinko
+// ==================== PLINKO GAME ====================
 app.post('/api/games/plinko', authenticateToken, async (req, res) => {
     try {
         const { bet } = req.body;
@@ -141,7 +323,11 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Minimum bet is $0.10' });
         }
 
-        const user = db.users.find(u => u.id === userId);
+        const user = await queryOne(
+            'SELECT balance FROM users WHERE id = ?',
+            [userId]
+        );
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -150,7 +336,10 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Insufficient balance' });
         }
 
-        user.balance -= bet;
+        await run(
+            'UPDATE users SET balance = balance - ? WHERE id = ?',
+            [bet, userId]
+        );
 
         const multipliers = [0.5, 1.2, 5.0, 1.2, 0.5];
         const mult = multipliers[Math.floor(Math.random() * multipliers.length)];
@@ -158,18 +347,16 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
         const isWin = mult >= 1;
 
         if (isWin) {
-            user.balance += winAmount;
+            await run(
+                'UPDATE users SET balance = balance + ? WHERE id = ?',
+                [winAmount, userId]
+            );
         }
 
-        // Save game
-        db.games.push({
-            user_id: userId,
-            game_type: 'plinko',
-            bet_amount: bet,
-            win_amount: isWin ? winAmount : 0,
-            multiplier: mult,
-            created_at: new Date().toISOString()
-        });
+        const updated = await queryOne(
+            'SELECT balance FROM users WHERE id = ?',
+            [userId]
+        );
 
         res.json({
             success: true,
@@ -178,48 +365,39 @@ app.post('/api/games/plinko', authenticateToken, async (req, res) => {
                 winAmount: isWin ? winAmount : 0,
                 isWin
             },
-            newBalance: user.balance
+            newBalance: updated.balance
         });
     } catch (error) {
         console.error('Plinko error:', error);
-        res.status(500).json({ error: 'Game failed' });
+        res.status(500).json({ error: 'Game failed: ' + error.message });
     }
 });
 
-// Get Balance
-app.get('/api/wallet/balance', authenticateToken, (req, res) => {
+// ==================== WALLET ====================
+app.get('/api/wallet/balance', authenticateToken, async (req, res) => {
     try {
-        const user = db.users.find(u => u.id === req.user.id);
+        const user = await queryOne(
+            'SELECT balance, bonus_balance FROM users WHERE id = ?',
+            [req.user.id]
+        );
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json({ balance: user.balance });
+
+        res.json({
+            balance: user.balance,
+            bonusBalance: user.bonus_balance || 0
+        });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch balance' });
     }
 });
 
-// Test
-app.get('/api/test', (req, res) => {
-    res.json({
-        message: 'API is working! 🎉',
-        status: 'Ready to use!',
-        users: db.users.length,
-        timestamp: new Date().toISOString()
-    });
-});
-
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        message: 'BetVora API is running! 🚀',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// ==================== START ====================
+// ==================== START SERVER ====================
 app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+    console.log(`🗄️  Database: SQLite (betvora.db)`);
     console.log(`📡 API: http://localhost:${PORT}/api/test`);
-    console.log(`💾 Memory database ready (data resets on restart)`);
+    console.log(`📝 Register: POST /api/auth/register`);
 });
