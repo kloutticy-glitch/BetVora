@@ -108,6 +108,24 @@ function run(sql, params = []) {
     });
 }
 
+// ==================== AUTH MIDDLEWARE ====================
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid token' });
+        }
+        req.user = decoded;
+        next();
+    });
+}
+
 // ==================== BETNEX GAME PROVIDER ====================
 const betnex = new Betnex(process.env.BETNEX_API_KEY || 'test-key', { debug: false });
 
@@ -181,25 +199,12 @@ app.post('/api/webhook/betnex', async (req, res) => {
     }
 });
 
-// ==================== ROUTES ====================
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Server is running with SQLite!' });
-});
-
-app.get('/api/test', (req, res) => {
-    res.json({ message: 'API is working! 🎉', database: 'SQLite' });
-});
-
 // ==================== AUTH ROUTES ====================
 
 // REGISTER
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
-
-        console.log('📝 Registration attempt:', { username, email });
 
         if (!username || !email || !password) {
             return res.status(400).json({ error: 'All fields required' });
@@ -209,7 +214,6 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        // Check if user exists
         const existing = await queryOne(
             'SELECT * FROM users WHERE email = ? OR username = ?',
             [email, username]
@@ -295,24 +299,6 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// ==================== AUTH MIDDLEWARE ====================
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(403).json({ error: 'Invalid token' });
-        }
-        req.user = decoded;
-        next();
-    });
-}
-
 // ==================== PLINKO GAME ====================
 app.post('/api/games/plinko', authenticateToken, async (req, res) => {
     try {
@@ -392,6 +378,15 @@ app.get('/api/wallet/balance', authenticateToken, async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch balance' });
     }
+});
+
+// ==================== HEALTH ====================
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', message: 'BetVora API is running! 🚀' });
+});
+
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'API is working! 🎉', database: 'SQLite' });
 });
 
 // ==================== START SERVER ====================
