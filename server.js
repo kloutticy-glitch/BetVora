@@ -129,28 +129,25 @@ function authenticateToken(req, res, next) {
 // ==================== BETNEX GAME PROVIDER - FIXED ====================
 const betnex = new Betnex(process.env.BETNEX_API_KEY || 'test-key', { debug: false });
 
-// Get games list - COMPLETELY REWRITTEN
+// Get games list - FETCHES FROM ALL PROVIDERS
 app.get('/api/provider/games', authenticateToken, async (req, res) => {
     try {
         console.log('📡 Fetching Betnex games...');
         
-        // Try to get providers
+        // Get all providers
         let providers = [];
         try {
             const providersResult = await betnex.getProviders();
             console.log('✅ Providers result:', providersResult);
             
-            // Handle different response formats
             if (Array.isArray(providersResult)) {
                 providers = providersResult;
             } else if (providersResult && typeof providersResult === 'object') {
-                // If it's an object, try to find the array
                 if (providersResult.data && Array.isArray(providersResult.data)) {
                     providers = providersResult.data;
                 } else if (providersResult.providers && Array.isArray(providersResult.providers)) {
                     providers = providersResult.providers;
                 } else {
-                    // Try to extract any array from the object
                     for (const key in providersResult) {
                         if (Array.isArray(providersResult[key])) {
                             providers = providersResult[key];
@@ -161,21 +158,16 @@ app.get('/api/provider/games', authenticateToken, async (req, res) => {
             }
         } catch (e) {
             console.log('⚠️ Could not get providers:', e.message);
-            // Use default providers
-            providers = ['PRAGMATIC', 'HACKSAW', 'SPRIBE', 'EVOLUTION'];
+            providers = ['PRAGMATIC', 'HACKSAW', 'SPRIBE', 'EVOLUTION', 'WYNSO', 'PLAYNGO', 'NETENT', 'MICROGAMING'];
         }
         
         console.log('📋 Providers list:', providers);
         
-        // If no providers, use defaults
-        if (!providers || providers.length === 0) {
-            providers = ['PRAGMATIC', 'HACKSAW', 'SPRIBE', 'EVOLUTION'];
-        }
-        
-        // Get games from providers
+        // Get games from ALL providers
         let allGames = [];
         let usedProvider = null;
         
+        // Try each provider until we find games
         for (const provider of providers) {
             if (typeof provider !== 'string') continue;
             try {
@@ -193,23 +185,26 @@ app.get('/api/provider/games', authenticateToken, async (req, res) => {
                 }
                 
                 if (gamesArray.length > 0) {
-                    allGames = gamesArray;
-                    usedProvider = provider;
-                    console.log(`✅ Found ${allGames.length} games from ${provider}`);
-                    break;
+                    allGames = allGames.concat(gamesArray);
+                    if (!usedProvider) usedProvider = provider;
+                    console.log(`✅ Found ${gamesArray.length} games from ${provider}`);
                 }
             } catch (e) {
                 console.log(`❌ Error fetching from ${provider}:`, e.message);
             }
         }
         
-        // If still no games, return sample games for testing
+        console.log(`📊 Total games found: ${allGames.length}`);
+        
+        // If no games found, return demo games
         if (allGames.length === 0) {
-            console.log('⚠️ No games found from providers, returning sample games');
+            console.log('⚠️ No games found, returning demo games');
             allGames = [
                 { id: 'plinko-demo', name: 'Plinko Demo', provider: 'BetVora' },
                 { id: 'mines-demo', name: 'Mines Demo', provider: 'BetVora' },
                 { id: 'slots-demo', name: 'Slots Demo', provider: 'BetVora' },
+                { id: 'crash-demo', name: 'Crash Demo', provider: 'BetVora' },
+                { id: 'dice-demo', name: 'Dice Demo', provider: 'BetVora' },
             ];
         }
         
@@ -222,7 +217,7 @@ app.get('/api/provider/games', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Betnex games error:', error);
-        // Return sample games so the site still works
+        // Return demo games so the site still works
         res.json({
             success: true,
             providers: ['BetVora'],
@@ -230,9 +225,11 @@ app.get('/api/provider/games', authenticateToken, async (req, res) => {
                 { id: 'plinko-demo', name: 'Plinko Demo', provider: 'BetVora' },
                 { id: 'mines-demo', name: 'Mines Demo', provider: 'BetVora' },
                 { id: 'slots-demo', name: 'Slots Demo', provider: 'BetVora' },
+                { id: 'crash-demo', name: 'Crash Demo', provider: 'BetVora' },
+                { id: 'dice-demo', name: 'Dice Demo', provider: 'BetVora' },
             ],
             usedProvider: 'BetVora',
-            count: 3,
+            count: 5,
             note: 'Using demo games - check Betnex API key'
         });
     }
@@ -244,6 +241,30 @@ app.post('/api/provider/launch', authenticateToken, async (req, res) => {
         const { gameId, bet } = req.body;
         const userId = req.user.id;
 
+        // Check if it's a demo game
+        if (gameId && gameId.includes('demo')) {
+            const winAmount = bet * 1.5;
+            const isWin = Math.random() > 0.4;
+            const finalWin = isWin ? winAmount : 0;
+            
+            if (isWin) {
+                await run('UPDATE users SET balance = balance + ? WHERE id = ?', [winAmount, userId]);
+            }
+            
+            const updated = await queryOne('SELECT balance FROM users WHERE id = ?', [userId]);
+            
+            return res.json({
+                success: true,
+                isDemo: true,
+                result: {
+                    isWin,
+                    winAmount: finalWin,
+                    multiplier: 1.5
+                },
+                newBalance: updated.balance
+            });
+        }
+
         const user = await queryOne('SELECT balance FROM users WHERE id = ?', [userId]);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -253,16 +274,6 @@ app.post('/api/provider/launch', authenticateToken, async (req, res) => {
         }
 
         await run('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId]);
-
-        // Check if it's a demo game
-        if (gameId.includes('demo')) {
-            // Return a fake game URL for demo
-            return res.json({
-                success: true,
-                gameUrl: 'https://betvora.com/demo-game',
-                isDemo: true
-            });
-        }
 
         const launch = await betnex.launchGame({
             username: userId.toString(),
