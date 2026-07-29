@@ -2764,19 +2764,40 @@
         async function loadBetnexGames() {
             try {
                 console.log('🔄 Loading Betnex games...');
+                
+                // Check if container exists, if not create it
+                let container = document.getElementById('betnexGamesContainer');
+                if (!container) {
+                    console.log('⚠️ Container not found, creating it...');
+                    const catalogContainer = document.getElementById('catalogSectionsContainer');
+                    if (!catalogContainer) {
+                        console.error('❌ Catalog container not found!');
+                        return;
+                    }
+                    
+                    // Create the container
+                    const betnexBlock = document.createElement('div');
+                    betnexBlock.className = 'section-block';
+                    betnexBlock.innerHTML = `
+                        <div class="section-heading">
+                            <div class="section-title-text">🎰 Casino Games</div>
+                            <span style="font-size:0.5rem;color:var(--text-muted);">⬅️ Scroll to see all games ➡️</span>
+                        </div>
+                        <div id="betnexGamesContainer" class="betnex-games-scroll">
+                            <p style="color:var(--text-muted);padding:20px;width:100%;text-align:center;">Loading games...</p>
+                        </div>
+                    `;
+                    catalogContainer.appendChild(betnexBlock);
+                    container = document.getElementById('betnexGamesContainer');
+                }
+                
                 const response = await apiCall('/provider/games');
                 console.log('📦 Response:', response);
                 
                 const games = response.games || [];
-                const container = document.getElementById('betnexGamesContainer');
-                
-                if (!container) {
-                    console.error('❌ betnexGamesContainer not found!');
-                    return;
-                }
                 
                 if (games.length === 0) {
-                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">No games available. Add your Betnex API key!</p>';
+                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;width:100%;text-align:center;">No games available. Add your Betnex API key!</p>';
                     return;
                 }
                 
@@ -2823,7 +2844,7 @@
                 console.error('❌ Failed to load games:', error);
                 const container = document.getElementById('betnexGamesContainer');
                 if (container) {
-                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">Failed to load games. Make sure Betnex is configured.</p>';
+                    container.innerHTML = '<p style="color:var(--text-muted);padding:20px;width:100%;text-align:center;">Failed to load games. Make sure Betnex is configured.</p>';
                 }
             }
         }
@@ -3044,7 +3065,7 @@
             if (currentUser.isLoggedIn) {
                 setTimeout(() => {
                     loadBetnexGames();
-                }, 500);
+                }, 800);
             }
         }
 
