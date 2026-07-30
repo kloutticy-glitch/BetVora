@@ -2253,6 +2253,14 @@
                         </div>
                         <button class="btn btn-green" onclick="dropPlinko()">DROP</button>
                     </div>
+                    <!-- PROVABLY FAIR VERIFICATION UI -->
+                    <div style="margin-top: 12px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.55rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                            <div style="color: var(--text-muted);">🔐 Game Hash: <span id="plinkoHash" style="color: var(--brand-green); font-family: monospace;">—</span></div>
+                            <button class="btn btn-sm" onclick="verifyGame()" style="font-size: 0.5rem; padding: 2px 10px;">🔍 Verify Fairness</button>
+                        </div>
+                        <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 3px;">SHA-256 provably fair. Click Verify to check authenticity.</div>
+                    </div>
                 </div>
             </div>
 
@@ -2427,6 +2435,16 @@
                     <button class="btn btn-green" onclick="saveNewUsername()" style="padding:3px 10px;font-size:0.6rem;">Save</button>
                 </div>
                 <div style="font-size:0.45rem;color:var(--text-muted);">⏳ 5 day cooldown</div>
+            </div>
+
+            <!-- PROVABLY FAIR CLIENT SEED -->
+            <div style="margin-bottom: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
+                <div style="font-size: 0.55rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 3px;">🎲 Client Seed (Provably Fair)</div>
+                <div style="display: flex; gap: 4px;">
+                    <input type="text" id="clientSeedInput" placeholder="Enter your seed" style="flex: 1; font-size: 0.65rem; font-family: monospace;">
+                    <button class="btn btn-green" onclick="updateClientSeed()" style="padding: 3px 10px; font-size: 0.6rem;">Update</button>
+                </div>
+                <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 3px;">Changing your seed resets the nonce (game counter). Current: <span id="currentClientSeed" style="color: var(--brand-green); font-family: monospace;">—</span></div>
             </div>
 
             <div class="balance-block">
@@ -2661,9 +2679,7 @@
                 throw new Error(data.error || 'API call failed');
             }
             return data;
-        }
-
-        // ======================================================
+        }        // ======================================================
         // 3. AUTH FUNCTIONS
         // ======================================================
 
@@ -2693,6 +2709,8 @@
                 currentUser.isLoggedIn = true;
                 currentUser.id = data.userId;
                 currentUser.name = data.username;
+                currentUser.clientSeed = data.clientSeed || 'default_seed';
+                currentUser.nonce = 0;
                 userBalance = data.balance;
                 triggerToast(`Welcome ${data.username}! 🎉`, 'win');
                 closeModal('authModal');
@@ -2725,6 +2743,8 @@
                 currentUser.isLoggedIn = true;
                 currentUser.id = data.id;
                 currentUser.name = data.username;
+                currentUser.clientSeed = data.clientSeed || 'default_seed';
+                currentUser.nonce = data.nonce || 0;
                 userBalance = data.balance;
                 triggerToast(`Welcome back, ${data.username}! 🔄`, 'win');
                 closeModal('authModal');
@@ -2893,8 +2913,72 @@
         }
 
         // ======================================================
-        // 5. GAME FUNCTIONS - FIXED WITH USER ID
+        // 5. GAME FUNCTIONS - UPDATED WITH PROVABLY FAIR
         // ======================================================
+
+        let lastSessionId = null;
+        let lastGameHash = null;
+
+        function verifyGame() {
+            if (!lastSessionId) {
+                triggerToast('No game to verify', 'loss');
+                return;
+            }
+            
+            showLoading(true);
+            apiCall('/verify', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId: lastSessionId })
+            })
+            .then(data => {
+                showLoading(false);
+                if (data.isValid) {
+                    triggerToast('✅ Game verified! 100% provably fair!', 'win');
+                    fireConfetti(30);
+                    console.log('🔐 Verification Data:', data);
+                } else {
+                    triggerToast('❌ Verification failed! Contact support.', 'loss');
+                }
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast('Verification error: ' + err.message, 'loss');
+            });
+        }
+
+        function updateClientSeed() {
+            if (!currentUser.isLoggedIn) {
+                triggerToast('Please login first', 'loss');
+                return;
+            }
+            
+            const newSeed = document.getElementById('clientSeedInput').value.trim();
+            if (!newSeed || newSeed.length < 3) {
+                triggerToast('Seed must be at least 3 characters', 'loss');
+                return;
+            }
+            
+            showLoading(true);
+            apiCall('/user/update-seed', {
+                method: 'POST',
+                body: JSON.stringify({
+                    userId: currentUser.id,
+                    newSeed: newSeed
+                })
+            })
+            .then(data => {
+                showLoading(false);
+                currentUser.clientSeed = data.clientSeed;
+                currentUser.nonce = data.nonce;
+                document.getElementById('currentClientSeed').textContent = data.clientSeed;
+                triggerToast('✅ Client seed updated!', 'win');
+                saveState();
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast('Error: ' + err.message, 'loss');
+            });
+        }
 
         function dropPlinko() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
@@ -2904,6 +2988,7 @@
 
             document.getElementById('plinkoDropVisual').textContent = '🟡';
             document.getElementById('plinkoStatusText').textContent = 'Dropping...';
+            document.getElementById('plinkoHash').textContent = '⏳ Calculating...';
 
             showLoading(true);
             apiCall('/games/plinko', {
@@ -2916,6 +3001,14 @@
             .then(data => {
                 userBalance = data.newBalance;
                 updateBalance();
+                
+                // Show hash for verification
+                if (data.result.hash) {
+                    document.getElementById('plinkoHash').textContent = data.result.hash.substring(0, 16) + '...';
+                    lastSessionId = data.result.sessionId;
+                    lastGameHash = data.result.hash;
+                }
+                
                 if (data.result.isWin) {
                     triggerToast(`🎯 ${data.result.multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
                     playSound('win');
@@ -3278,6 +3371,7 @@
             updateBetHistory();
             updateTransactionHistory();
             updateBonusUI();
+            document.getElementById('currentClientSeed').textContent = currentUser.clientSeed || '—';
 
             const loginBtn = document.querySelector('.header-right .btn-primary');
             const registerBtn = document.querySelector('.header-right .btn-green');
@@ -3297,7 +3391,7 @@
         }
 
         // ======================================================
-        // 8. ALL ORIGINAL FUNCTIONS BELOW (unchanged)
+        // 8. ALL ORIGINAL FUNCTIONS BELOW
         // ======================================================
 
         // NAME ARRAYS
@@ -3491,6 +3585,8 @@
             isLoggedIn: false,
             email: '',
             password: '',
+            clientSeed: 'default_seed',
+            nonce: 0,
             degenRank: 'bronze',
             totalWagered: 0,
             referrals: 0,
@@ -3552,6 +3648,8 @@
                         currentUser.isLoggedIn = data.isLoggedIn;
                         currentUser.id = data.id || null;
                         currentUser.name = data.name || 'Guest';
+                        currentUser.clientSeed = data.clientSeed || 'default_seed';
+                        currentUser.nonce = data.nonce || 0;
                         currentUser.level = data.level || 'Starter';
                         currentUser.email = data.email || '';
                         currentUser.password = data.password || '';
@@ -3593,6 +3691,8 @@
                     isLoggedIn: currentUser.isLoggedIn,
                     id: currentUser.id,
                     name: currentUser.name,
+                    clientSeed: currentUser.clientSeed,
+                    nonce: currentUser.nonce,
                     level: currentUser.level,
                     email: currentUser.email,
                     password: currentUser.password,
@@ -4649,7 +4749,6 @@
             if (dynModal) dynModal.innerHTML = '';
         }
 
-        // MINES GRID INIT
         // SLOTS SYMBOLS
         const slotSyms = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
 
