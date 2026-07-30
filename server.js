@@ -487,6 +487,70 @@ app.post('/api/games/wheel', (req, res) => {
 });
 
 // ============================================================
+// GAME: SLOTS (Provably Fair)
+// ============================================================
+
+app.post('/api/games/slots', (req, res) => {
+    const { bet, userId } = req.body;
+    
+    const user = users[parseInt(userId)];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+    
+    user.nonce++;
+    
+    const serverSeed = generateSeed();
+    const clientSeed = user.clientSeed;
+    const nonce = user.nonce;
+    const hash = getGameHash(serverSeed, clientSeed, nonce);
+    
+    const symbols = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
+    const hexParts = hash.match(/.{2}/g) || [];
+    
+    const s1 = symbols[parseInt(hexParts[0] || '00', 16) % symbols.length];
+    const s2 = symbols[parseInt(hexParts[1] || '00', 16) % symbols.length];
+    const s3 = symbols[parseInt(hexParts[2] || '00', 16) % symbols.length];
+    
+    let multiplier = 0;
+    if (s1 === s2 && s2 === s3) multiplier = 5.0;
+    else if (s1 === s2 || s2 === s3) multiplier = 1.5;
+    
+    const winAmount = multiplier > 0 ? bet * multiplier : 0;
+    
+    user.balance -= bet;
+    if (winAmount > 0) user.balance += winAmount;
+    user.totalWagered = (user.totalWagered || 0) + bet;
+    
+    const sessionId = `slots_${Date.now()}`;
+    gameSessions[sessionId] = {
+        game: 'slots',
+        serverSeed,
+        clientSeed,
+        nonce,
+        hash,
+        symbols: [s1, s2, s3],
+        multiplier,
+        winAmount,
+        isWin: winAmount > 0,
+        timestamp: Date.now()
+    };
+    
+    res.json({
+        result: {
+            symbols: [s1, s2, s3],
+            multiplier,
+            winAmount,
+            isWin: winAmount > 0,
+            hash,
+            sessionId,
+            clientSeed,
+            nonce
+        },
+        newBalance: user.balance
+    });
+});
+
+// ============================================================
 // VERIFICATION ENDPOINT
 // ============================================================
 
@@ -527,6 +591,18 @@ app.post('/api/verify', (req, res) => {
             expectedResult = multipliers[selected];
             isValid = expectedResult === session.multiplier;
             break;
+        case 'slots':
+            const symbols = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
+            const hexParts = hash.match(/.{2}/g) || [];
+            const s1 = symbols[parseInt(hexParts[0] || '00', 16) % symbols.length];
+            const s2 = symbols[parseInt(hexParts[1] || '00', 16) % symbols.length];
+            const s3 = symbols[parseInt(hexParts[2] || '00', 16) % symbols.length];
+            let mult = 0;
+            if (s1 === s2 && s2 === s3) mult = 5.0;
+            else if (s1 === s2 || s2 === s3) mult = 1.5;
+            expectedResult = { symbols: [s1, s2, s3], multiplier: mult };
+            isValid = expectedResult.multiplier === session.multiplier;
+            break;
     }
     
     res.json({
@@ -555,7 +631,8 @@ app.get('/api/provider/games', (req, res) => {
             { id: 'mines', name: 'Mines', provider: 'BetVora (Provably Fair)', icon: '💣' },
             { id: 'dice', name: 'Dice', provider: 'BetVora (Provably Fair)', icon: '🎲' },
             { id: 'crash', name: 'Crash', provider: 'BetVora (Provably Fair)', icon: '🚀' },
-            { id: 'wheel', name: 'Wheel', provider: 'BetVora (Provably Fair)', icon: '🎡' }
+            { id: 'wheel', name: 'Wheel', provider: 'BetVora (Provably Fair)', icon: '🎡' },
+            { id: 'slots', name: 'Slots', provider: 'BetVora (Provably Fair)', icon: '🎰' }
         ]
     });
 });
