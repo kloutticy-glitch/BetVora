@@ -82,6 +82,31 @@ const gameSessions = {};
 let idCounter = 1;
 
 // ============================================================
+// BETNEX INTEGRATION
+// ============================================================
+
+let betnex = null;
+let betnexEnabled = false;
+
+// Try to initialize Betnex
+try {
+    const { Betnex } = require('@betnex/sdk');
+    if (process.env.BETNEX_API_KEY) {
+        betnex = new Betnex({
+            apiKey: process.env.BETNEX_API_KEY,
+            secret: process.env.BETNEX_SECRET || '',
+        });
+        betnexEnabled = true;
+        console.log('✅ Betnex initialized successfully!');
+    } else {
+        console.log('⚠️ Betnex API keys not found. Using demo mode.');
+    }
+} catch (error) {
+    console.log('⚠️ Betnex SDK not installed. Using demo mode.');
+    console.log('   Error:', error.message);
+}
+
+// ============================================================
 // AUTH ENDPOINTS
 // ============================================================
 
@@ -621,28 +646,109 @@ app.post('/api/verify', (req, res) => {
 });
 
 // ============================================================
-// BETNEX PLACEHOLDER
+// BETNEX GAME ENDPOINTS (REAL SLOTS)
 // ============================================================
 
-app.get('/api/provider/games', (req, res) => {
-    res.json({
-        games: [
-            { id: 'plinko', name: 'Plinko', provider: 'BetVora (Provably Fair)', icon: '🟢' },
-            { id: 'mines', name: 'Mines', provider: 'BetVora (Provably Fair)', icon: '💣' },
-            { id: 'dice', name: 'Dice', provider: 'BetVora (Provably Fair)', icon: '🎲' },
-            { id: 'crash', name: 'Crash', provider: 'BetVora (Provably Fair)', icon: '🚀' },
-            { id: 'wheel', name: 'Wheel', provider: 'BetVora (Provably Fair)', icon: '🎡' },
-            { id: 'slots', name: 'Slots', provider: 'BetVora (Provably Fair)', icon: '🎰' }
-        ]
-    });
+app.get('/api/provider/games', async (req, res) => {
+    try {
+        if (betnexEnabled && betnex) {
+            console.log('🔄 Fetching real games from Betnex...');
+            
+            try {
+                const games = await betnex.getGames({
+                    provider: 'SPRIBE',
+                    limit: 20,
+                });
+                
+                if (games && games.length > 0) {
+                    console.log(`✅ Loaded ${games.length} real games from Betnex`);
+                    return res.json({ games: games });
+                }
+            } catch (e) {
+                console.log('⚠️ Betnex fetch error:', e.message);
+            }
+        }
+        
+        console.log('📦 Returning demo games');
+        res.json({
+            games: [
+                { id: 'plinko', name: 'Plinko', provider: 'BetVora (Provably Fair)', icon: '🟢' },
+                { id: 'mines', name: 'Mines', provider: 'BetVora (Provably Fair)', icon: '💣' },
+                { id: 'dice', name: 'Dice', provider: 'BetVora (Provably Fair)', icon: '🎲' },
+                { id: 'crash', name: 'Crash', provider: 'BetVora (Provably Fair)', icon: '🚀' },
+                { id: 'wheel', name: 'Wheel', provider: 'BetVora (Provably Fair)', icon: '🎡' },
+                { id: 'slots', name: 'Slots', provider: 'BetVora (Provably Fair)', icon: '🎰' }
+            ]
+        });
+    } catch (error) {
+        console.error('❌ Error fetching games:', error);
+        res.status(500).json({ error: 'Failed to fetch games' });
+    }
 });
 
-app.post('/api/provider/launch', (req, res) => {
-    res.json({
-        gameUrl: null,
-        isDemo: true,
-        message: 'Betnex not configured yet'
-    });
+app.post('/api/provider/launch', async (req, res) => {
+    try {
+        const { gameId, bet, userId } = req.body;
+        
+        const user = users[parseInt(userId)];
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        if (bet > user.balance) {
+            return res.status(400).json({ error: 'Insufficient balance' });
+        }
+        
+        if (betnexEnabled && betnex) {
+            try {
+                const launch = await betnex.launchGame({
+                    username: user.username,
+                    gameId: gameId,
+                    money: user.balance,
+                    platform: 1,
+                    currency: 'USD',
+                    home_url: 'https://betvora-cryptocasino.netlify.app',
+                    lang: 'en',
+                    betAmount: bet,
+                });
+                
+                user.balance -= bet;
+                user.totalWagered = (user.totalWagered || 0) + bet;
+                
+                return res.json({
+                    gameUrl: launch.payload.game_launch_url,
+                    isDemo: false,
+                    newBalance: user.balance
+                });
+            } catch (e) {
+                console.log('⚠️ Betnex launch failed:', e.message);
+            }
+        }
+        
+        // Demo mode
+        const isWin = Math.random() > 0.5;
+        const multiplier = isWin ? (Math.random() * 3 + 1.5).toFixed(1) : 0;
+        const winAmount = isWin ? bet * parseFloat(multiplier) : 0;
+        
+        user.balance -= bet;
+        if (isWin) user.balance += winAmount;
+        user.totalWagered = (user.totalWagered || 0) + bet;
+        
+        res.json({
+            gameUrl: null,
+            isDemo: true,
+            result: {
+                isWin: isWin,
+                multiplier: multiplier,
+                winAmount: winAmount
+            },
+            newBalance: user.balance
+        });
+        
+    } catch (error) {
+        console.error('❌ Error launching game:', error);
+        res.status(500).json({ error: 'Failed to launch game' });
+    }
 });
 
 // ============================================================
@@ -651,8 +757,9 @@ app.post('/api/provider/launch', (req, res) => {
 
 app.get('/api/test', (req, res) => {
     res.json({
-        message: 'BetVora API with Provably Fair system! 🚀',
+        message: 'BetVora API with Provably Fair + Betnex! 🚀',
         status: 'online',
+        betnex: betnexEnabled ? '✅ Connected' : '❌ Demo mode',
         users: Object.keys(users).length,
         sessions: Object.keys(gameSessions).length
     });
@@ -666,5 +773,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🔐 Provably Fair system ENABLED`);
+    console.log(`🎰 Betnex: ${betnexEnabled ? '✅ CONNECTED' : '❌ DEMO MODE'}`);
     console.log(`👥 Users registered: ${Object.keys(users).length}`);
 });
