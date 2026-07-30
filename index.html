@@ -12,7 +12,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" />
 
     <style>
-        /* ======================== ROOT VARIABLES ======================== */
         :root {
             --bg-base: #0a0d14;
             --bg-sidebar: #101420;
@@ -36,7 +35,6 @@
             --radius-sm: 6px;
         }
 
-        /* ======================== ANIMATED BG ======================== */
         .animated-bg {
             position: fixed;
             top: 0;
@@ -55,7 +53,6 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* ======================== RESET & BASE ======================== */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -86,7 +83,6 @@
             border-radius: 10px;
         }
 
-        /* ======================== PARTICLES ======================== */
         #particles-canvas {
             position: fixed;
             top: 0;
@@ -98,7 +94,6 @@
             opacity: 0.15;
         }
 
-        /* ======================== CONFETTI ======================== */
         .confetti-container {
             position: fixed;
             top: 0;
@@ -127,7 +122,6 @@
             }
         }
 
-        /* ======================== HEADER ======================== */
         header {
             position: sticky;
             top: 0;
@@ -415,7 +409,6 @@
             background: rgba(0, 230, 153, 0.05);
         }
 
-        /* ======================== APP BODY ======================== */
         .app-body {
             display: flex;
             flex: 1;
@@ -484,7 +477,6 @@
             margin: 4px 0;
         }
 
-        /* ======================== MAIN CONTENT ======================== */
         main {
             flex: 1;
             padding: 16px 20px 60px;
@@ -492,7 +484,6 @@
             min-width: 0;
         }
 
-        /* ======================== GAME CARD - PORTRAIT ======================== */
         .games-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -625,7 +616,6 @@
             transform: scale(1);
         }
 
-        /* ======================== DEG STATS ======================== */
         .deg-stats-bar {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -717,7 +707,6 @@
             flex-wrap: wrap;
         }
 
-        /* ======================== BONUS PROGRESS ======================== */
         .bonus-progress-bar {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -1083,7 +1072,6 @@
             text-shadow: 0 0 20px var(--brand-green-glow);
         }
 
-        /* ======================== BETNEX GAME CARD (NEW) ======================== */
         .betnex-game-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -1185,7 +1173,6 @@
             border-radius: 4px;
         }
 
-        /* ======================== QUICK BET BUTTONS ======================== */
         .quick-bets {
             display: flex;
             gap: 4px;
@@ -1204,7 +1191,6 @@
             border-color: var(--brand-green);
         }
 
-        /* ======================== MODALS ======================== */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -1347,7 +1333,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* ======================== ACCOUNT ======================== */
         .account-header {
             display: flex;
             align-items: center;
@@ -1466,7 +1451,6 @@
             background: #2c354a;
         }
 
-        /* ======================== DEGEN RANKS ======================== */
         .degen-rank-badge {
             display: inline-block;
             padding: 1px 8px;
@@ -1557,7 +1541,6 @@
             transition: width 0.5s;
         }
 
-        /* ======================== BONUS TIERS MODAL ======================== */
         .bonus-tier-card {
             background: var(--panel);
             border: 1px solid var(--border);
@@ -1673,7 +1656,6 @@
             color: var(--text-muted);
         }
 
-        /* ======================== LEADERBOARD ======================== */
         .leaderboard-entry {
             display: flex;
             align-items: center;
@@ -1832,7 +1814,6 @@
             background: #1a1035;
         }
 
-        /* ======================== RESPONSIVE ======================== */
         @media (max-width: 1024px) {
             .hero-wrapper {
                 grid-template-columns: 1fr;
@@ -2053,22 +2034,15 @@
 </head>
 <body>
 
-    <!-- ANIMATED BACKGROUND -->
     <div class="animated-bg"></div>
-
-    <!-- PARTICLES -->
     <canvas id="particles-canvas"></canvas>
-
-    <!-- CONFETTI -->
     <div class="confetti-container" id="confettiContainer"></div>
 
-    <!-- LOADING -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <p style="color:var(--text-muted); font-weight:700; font-size:0.8rem;">Loading...</p>
     </div>
 
-    <!-- HEADER -->
     <header>
         <div class="header-left">
             <a class="logo" onclick="location.reload()">BET<span>VORA</span></a>
@@ -2103,10 +2077,7 @@
             <button class="btn btn-primary" onclick="openAuthModal('login')" style="font-weight:800;">Login</button>
             <button class="btn btn-green" onclick="openAuthModal('register')">Register</button>
         </div>
-    </header>
-
-    <!-- APP BODY -->
-    <div class="app-body">
+    </header>    <div class="app-body">
         <sidebar>
             <div class="nav-group">
                 <div class="nav-item active" id="navAll" onclick="filterCategory('all')"><span class="icon">🏠</span> Home</div>
@@ -2142,7 +2113,6 @@
         </sidebar>
 
         <main>
-            <!-- HERO -->
             <div class="hero-wrapper">
                 <div class="hero-banner-left">
                     <h1>BetVora</h1>
@@ -2168,7 +2138,6 @@
                 </div>
             </div>
 
-            <!-- BONUS PROGRESS BAR -->
             <div class="bonus-progress-bar" id="bonusProgressBar">
                 <div class="label">
                     🎯 <span id="bonusTierLabel">Tier 1</span>
@@ -2182,7 +2151,6 @@
                 <span class="claimed-text" id="bonusClaimedText" style="display:none;">✅ Claimed!</span>
             </div>
 
-            <!-- DEGENERATE STATS -->
             <div class="deg-stats-bar">
                 <div class="deg-stat-card">
                     <div class="stat-number zero" id="degWagered">$0</div>
@@ -2202,13 +2170,11 @@
                 </div>
             </div>
 
-            <!-- TOP MULTIPLIERS -->
             <div class="top-multipliers-bar">
                 <div class="top-multipliers-label">🔥 Top Multipliers</div>
                 <div class="multiplier-scroll-track" id="multipliersTrack"></div>
             </div>
 
-            <!-- TRENDING -->
             <div class="trending-now-section">
                 <div class="trending-label">📈 Trending</div>
                 <div class="trending-games" id="trendingGames">
@@ -2219,7 +2185,6 @@
                 </div>
             </div>
 
-            <!-- LIVE WINS -->
             <div class="live-wins-bar">
                 <div class="live-wins-label">
                     <div class="dot-pulse"></div> Live Wins
@@ -2227,7 +2192,6 @@
                 <div class="wins-scroll-track" id="winsTrack"></div>
             </div>
 
-            <!-- GAME STAGES -->
             <div class="game-stage-modal" id="stagePlinko">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="font-family:'Syne'; font-size:1rem;">🕹️ PLINKO <span style="font-size:0.5rem;color:var(--text-muted);font-weight:600;">RTP: 97.5%</span></h3>
@@ -2253,7 +2217,6 @@
                         </div>
                         <button class="btn btn-green" onclick="dropPlinko()">DROP</button>
                     </div>
-                    <!-- PROVABLY FAIR VERIFICATION UI -->
                     <div style="margin-top: 12px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.55rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                             <div style="color: var(--text-muted);">🔐 Game Hash: <span id="plinkoHash" style="color: var(--brand-green); font-family: monospace;">—</span></div>
@@ -2389,12 +2352,10 @@
                 </div>
             </div>
 
-            <!-- CATALOG -->
             <div id="catalogSectionsContainer"></div>
         </main>
     </div>
 
-    <!-- MODALS -->
     <div class="modal-overlay" id="accountModal">
         <div class="modal-card">
             <div style="position:absolute;top:8px;right:12px;cursor:pointer;color:var(--text-muted);" onclick="closeModal('accountModal')">✕</div>
@@ -2437,7 +2398,6 @@
                 <div style="font-size:0.45rem;color:var(--text-muted);">⏳ 5 day cooldown</div>
             </div>
 
-            <!-- PROVABLY FAIR CLIENT SEED -->
             <div style="margin-bottom: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
                 <div style="font-size: 0.55rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 3px;">🎲 Client Seed (Provably Fair)</div>
                 <div style="display: flex; gap: 4px;">
@@ -2560,7 +2520,6 @@
         </div>
     </div>
 
-    <!-- BONUS MODAL -->
     <div class="modal-overlay" id="bonusModal">
         <div class="modal-card wide enhanced">
             <div class="modal-header">
@@ -2572,7 +2531,6 @@
         </div>
     </div>
 
-    <!-- DEGEN RANKS MODAL -->
     <div class="modal-overlay" id="degenRanksModal">
         <div class="modal-card wide">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -2651,19 +2609,12 @@
         </div>
     </div>
 
-    <!-- TOASTS -->
     <div class="toast-box" id="toastBox"></div>
 
     <script>
-        // ======================================================
-        // 1. API CONFIGURATION
-        // ======================================================
         const API_URL = 'https://betvora-backend.onrender.com/api';
         let authToken = localStorage.getItem('authToken');
 
-        // ======================================================
-        // 2. API HELPER
-        // ======================================================
         async function apiCall(endpoint, options = {}) {
             const response = await fetch(`${API_URL}${endpoint}`, {
                 ...options,
@@ -2673,17 +2624,12 @@
                     ...options.headers
                 }
             });
-
             const data = await response.json();
             if (!response.ok) {
                 throw new Error(data.error || 'API call failed');
             }
             return data;
-        }        // ======================================================
-        // 3. AUTH FUNCTIONS
-        // ======================================================
-
-        function registerEmailAccount() {
+        }        function registerEmailAccount() {
             const username = document.getElementById('regUsername').value.trim();
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPass').value.trim();
@@ -2776,10 +2722,6 @@
             closeModal('accountModal');
             saveState();
         }
-
-        // ======================================================
-        // 4. BETNEX GAME FUNCTIONS
-        // ======================================================
 
         async function loadBetnexGames() {
             try {
@@ -2912,10 +2854,6 @@
             }
         }
 
-        // ======================================================
-        // 5. GAME FUNCTIONS - UPDATED WITH PROVABLY FAIR
-        // ======================================================
-
         let lastSessionId = null;
         let lastGameHash = null;
 
@@ -3002,7 +2940,6 @@
                 userBalance = data.newBalance;
                 updateBalance();
                 
-                // Show hash for verification
                 if (data.result.hash) {
                     document.getElementById('plinkoHash').textContent = data.result.hash.substring(0, 16) + '...';
                     lastSessionId = data.result.sessionId;
@@ -3260,10 +3197,6 @@
             saveState();
         }
 
-        // ======================================================
-        // 6. RENDER CATALOG
-        // ======================================================
-
         function renderCatalog(filter = 'all') {
             const container = document.getElementById('catalogSectionsContainer');
             container.innerHTML = '';
@@ -3339,7 +3272,6 @@
                 });
             });
 
-            // Add Betnex games container
             const betnexBlock = document.createElement('div');
             betnexBlock.className = 'section-block';
             betnexBlock.innerHTML = `
@@ -3353,10 +3285,6 @@
             `;
             container.appendChild(betnexBlock);
         }
-
-        // ======================================================
-        // 7. UPDATE UI
-        // ======================================================
 
         function updateUI() {
             const displayName = currentUser.isLoggedIn ? currentUser.name : 'Guest';
@@ -3390,11 +3318,6 @@
             }
         }
 
-        // ======================================================
-        // 8. ALL ORIGINAL FUNCTIONS BELOW
-        // ======================================================
-
-        // NAME ARRAYS
         const leaderboardNames = [
             'HighRoller', 'LuckyStrike', 'AceHigh', 'RoyalFlush', 'BlackJackKing',
             'RouletteQueen', 'CrapsMaster', 'BaccaratBoss', 'PokerPro', 'CasinoRoyale',
@@ -3420,7 +3343,6 @@
             'NeonNinja', 'CyberSamurai', 'DigitalGhost', 'QuantumLeap', 'StellarVoyager'
         ];
 
-        // BONUS TIERS
         const BONUS_TIERS = [
             { id: 1, wager: 100, reward: 10, label: 'Tier 1', icon: '🥉' },
             { id: 2, wager: 500, reward: 50, label: 'Tier 2', icon: '🥈' },
@@ -3453,7 +3375,6 @@
             }
         }
 
-        // CLOCK
         function updateClock() {
             const now = new Date();
             document.getElementById('headerTime').textContent =
@@ -3462,7 +3383,6 @@
         setInterval(updateClock, 10000);
         updateClock();
 
-        // PARTICLES
         (function initParticles() {
             const canvas = document.getElementById('particles-canvas');
             const ctx = canvas.getContext('2d');
@@ -3510,7 +3430,6 @@
             animate();
         })();
 
-        // CONFETTI
         function fireConfetti(count = 60) {
             const container = document.getElementById('confettiContainer');
             const colors = ['#ffd700', '#00e699', '#ff3cac', '#0075ff', '#ff6b6b', '#ffd93d', '#6bcb77'];
@@ -3530,7 +3449,6 @@
             }
         }
 
-        // SOUND
         function playSound(type) {
             try {
                 const ctx = new(window.AudioContext || window.webkitAudioContext)();
@@ -3576,7 +3494,6 @@
             } catch (e) { /* silent */ }
         }
 
-        // APP STATE
         let userBalance = 0.00;
         let currentUser = {
             id: null,
@@ -3618,7 +3535,6 @@
         let walletConnected = false;
         let walletAddress = '';
 
-        // WALLET ADDRESSES
         const WALLETS = {
             BTC: { label: 'Bitcoin (BTC)', address: 'bc1q5gnwwhafjhygkhvfzqdc3slput2vmtw9c0ltcy', note: 'Send only BTC to this address.' },
             ETH: { label: 'Ethereum (ETH)', address: '0x54Cc6d9EdE0cb522FaC0F589F9e878075992d4B6', note: 'Send only ETH on mainnet.' },
@@ -3628,7 +3544,6 @@
         };
         let activeCoin = 'BTC';
 
-        // LOAD / SAVE STATE
         function loadState() {
             try {
                 const usersSaved = localStorage.getItem('betvora_all_users');
@@ -3717,7 +3632,6 @@
             } catch (e) { /* ignore */ }
         }
 
-        // UNIQUENESS CHECKS
         function isUsernameTaken(username) {
             if (!username) return false;
             return allUsernames.some(u => u.toLowerCase() === username.toLowerCase());
@@ -3765,7 +3679,6 @@
             return true;
         }
 
-        // BONUS SYSTEM
         function getCurrentTier() {
             const idx = currentUser.currentBonusTier;
             if (idx >= BONUS_TIERS.length) return null;
@@ -3845,7 +3758,6 @@
             saveState();
         }
 
-        // UPDATE BONUS UI
         function updateBonusUI() {
             const tier = getCurrentTier();
             const bar = document.getElementById('bonusProgressBar');
@@ -3982,7 +3894,6 @@
             openModal('bonusModal');
         }
 
-        // UPDATE USER WAGERED & DEGENERATE STATS
         function updateUserWagered(amount) {
             if (!currentUser.isLoggedIn) return;
             currentUser.totalWagered = (currentUser.totalWagered || 0) + amount;
@@ -4132,7 +4043,6 @@
             openModal('degenRanksModal');
         }
 
-        // TOAST SYSTEM
         function triggerToast(msg, type = 'green') {
             const box = document.getElementById('toastBox');
             const toast = document.createElement('div');
@@ -4146,7 +4056,6 @@
             }, 3500);
         }
 
-        // UI UPDATES
         function updateBalance() {
             const formatted = `$${userBalance.toFixed(2)}`;
             document.getElementById('userBalance').textContent = formatted;
@@ -4162,7 +4071,6 @@
             document.getElementById('loadingOverlay').classList.toggle('active', show);
         }
 
-        // BET HISTORY
         function addBetHistory(game, bet, win, isWin) {
             currentUser.betHistory.unshift({
                 game: game,
@@ -4190,9 +4098,7 @@
             updateDegenerateStats();
             updateRecentBetsSidebar(game, bet, win, isWin);
             saveState();
-        }
-
-        function updateBetHistory() {
+        }        function updateBetHistory() {
             const container = document.getElementById('betHistoryContainer');
             if (!container) return;
             if (currentUser.betHistory.length === 0) {
@@ -4219,7 +4125,6 @@
             }
         }
 
-        // TRANSACTION HISTORY
         function addTransaction(type, amount, details = '') {
             currentUser.transactions.unshift({
                 type: type,
@@ -4247,7 +4152,6 @@
             ).join('');
         }
 
-        // WALLET CONNECT
         async function connectWallet() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
@@ -4306,7 +4210,6 @@
             });
         }
 
-        // USERNAME CHANGE
         function saveNewUsername() {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Please login first', 'loss');
@@ -4341,7 +4244,6 @@
             saveState();
         }
 
-        // MODALS
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
@@ -4397,7 +4299,6 @@
             triggerToast('📋 Referral link copied!', 'gold');
         }
 
-        // DEPOSIT SYSTEM
         function selectDepositCoin(coin) {
             activeCoin = coin;
             const wallet = WALLETS[coin];
@@ -4418,7 +4319,6 @@
             triggerToast(`📋 ${activeCoin} address copied!`, 'gold');
         }
 
-        // WITHDRAW
         function processWithdraw() {
             const address = document.getElementById('withdrawAddress').value.trim();
             const amount = parseFloat(document.getElementById('withdrawAmount').value);
@@ -4443,7 +4343,6 @@
             document.getElementById('withdrawAmount').value = '';
         }
 
-        // LEADERBOARD
         function getLeaderboardData(period = 'weekly') {
             const realUsers = allUsers.filter(u => u.username && u.username !== 'Guest' && u.totalWagered > 0);
             const realData = realUsers.map(u => ({
@@ -4510,7 +4409,6 @@
             `;
         }
 
-        // TOP MULTIPLIERS
         function addTopMultiplier(name, amount, mult) {
             const track = document.getElementById('multipliersTrack');
             const card = document.createElement('div');
@@ -4548,7 +4446,6 @@
             }, delay);
         }
 
-        // LIVE WINS
         function recordLiveBet(game, user, betVal, multVal, isWin) {
             if (!isWin) return;
             const track = document.getElementById('winsTrack');
@@ -4596,7 +4493,6 @@
             }, delay);
         }
 
-        // GAME LIST
         const gamesList = [
             { id: 'wanted-dead', name: 'Wanted Dead or Wild', cat: 'trending', icon: '🤠', provider: 'Hacksaw Gaming' },
             { id: 'starlight-princess', name: 'Starlight Princess 1000', cat: 'trending', icon: '👸', provider: 'Pragmatic Play' },
@@ -4644,7 +4540,6 @@
             { id: 'sports-tennis', name: 'Wimbledon Finals', cat: 'sports', icon: '🎾', house: false, provider: 'Sportsbook Live' }
         ];
 
-        // FILTER FUNCTION
         function filterCategory(cat) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -4678,7 +4573,6 @@
             filterCategory(mode === 'sports' ? 'sports' : 'all');
         }
 
-        // GAME LAUNCHER
         function launchGame(id) {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Please login first', 'loss');
@@ -4749,10 +4643,8 @@
             if (dynModal) dynModal.innerHTML = '';
         }
 
-        // SLOTS SYMBOLS
         const slotSyms = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
 
-        // CRASH
         let crashActive = false;
         let crashMultiplier = 1.0;
         let crashInterval = null;
@@ -4840,7 +4732,6 @@
             saveState();
         }
 
-        // HI-LO
         let hiloStreak = 0;
         let hiloCurrentCard = null;
         let hiloBetAmount = 1.0;
@@ -4964,7 +4855,6 @@
             saveState();
         }
 
-        // TOWER
         function launchTower() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5027,7 +4917,6 @@
             }
         }
 
-        // KENO
         function launchKeno() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5077,7 +4966,6 @@
             saveState();
         }
 
-        // COIN FLIP
         function launchCoinFlip() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5113,7 +5001,6 @@
             saveState();
         }
 
-        // LIMBO
         function launchLimbo() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5152,7 +5039,6 @@
             saveState();
         }
 
-        // PACHINKO
         function launchPachinko() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5188,7 +5074,6 @@
             saveState();
         }
 
-        // ROCK PAPER SCISSORS
         function launchRPS() {
             if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
             const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
@@ -5243,7 +5128,6 @@
             saveState();
         }
 
-        // SEARCH
         function handleSearch(val) {
             const resultsContainer = document.getElementById('searchResults');
             if (!val || val.length < 1) {
@@ -5280,14 +5164,10 @@
             }
         });
 
-        // ======================================================
-        // INIT
-        // ======================================================
         loadState();
         renderCatalog();
         updateUI();
 
-        // Populate live wins & top multipliers
         setTimeout(() => {
             populateTopMultipliers();
             populateLiveWins();
