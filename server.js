@@ -1,69 +1,26 @@
 const express = require('express');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
-const { Betnex } = require('@betnex/sdk');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ========== DATABASE ==========
-const db = new sqlite3.Database('betvora.db');
+// ========== IN-MEMORY DATABASE ==========
+// This works on Render without needing SQLite
+const users = {};
+let idCounter = 1;
 
-// Create users table if it doesn't exist
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    email TEXT UNIQUE,
-    password TEXT,
-    balance REAL DEFAULT 100,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// Create transactions table
-db.run(`
-  CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT,
-    amount REAL,
-    game TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  )
-`);
-
-// ========== BETNEX SETUP ==========
-// Check if Betnex API keys exist
-const BETNEX_API_KEY = process.env.BETNEX_API_KEY;
-const BETNEX_SECRET = process.env.BETNEX_SECRET;
-
-let betnex = null;
-if (BETNEX_API_KEY && BETNEX_SECRET) {
-  betnex = new Betnex({
-    apiKey: BETNEX_API_KEY,
-    secret: BETNEX_SECRET,
-  });
-  console.log('✅ Betnex initialized');
-} else {
-  console.log('⚠️ Betnex API keys not found. Games will use demo mode.');
-}
-
-// ========== API ENDPOINTS ==========
-
-// Test endpoint
+// ========== TEST ENDPOINT ==========
 app.get('/api/test', (req, res) => {
   res.json({ 
     message: 'BetVora API is running! 🚀',
-    betnex: betnex ? 'Connected' : 'Not configured',
-    version: '1.0.0'
+    status: 'online',
+    users: Object.keys(users).length
   });
 });
 
-// Register user
+// ========== AUTH ENDPOINTS ==========
 app.post('/api/auth/register', (req, res) => {
   const { username, email, password } = req.body;
   
@@ -71,435 +28,312 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json({ error: 'All fields required' });
   }
   
-  db.run(
-    'INSERT INTO users (username, email, password, balance) VALUES (?, ?, ?, 100)',
-    [username, email, password],
-    function(err) {
-      if (err) {
-        return res.status(400).json({ error: 'Username or email already exists' });
-      }
-      res.json({ 
-        success: true, 
-        userId: this.lastID,
-        username: username,
-        balance: 100
-      });
-    }
-  );
-});
-
-// Login
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  
-  db.get(
-    'SELECT * FROM users WHERE email = ? AND password = ?',
-    [email, password],
-    (err, user) => {
-      if (err || !user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      res.json({
-        success: true,
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        balance: user.balance
-      });
-    }
-  );
-});
-
-// Get user balance
-app.get('/api/user/:id/balance', (req, res) => {
-  db.get(
-    'SELECT balance FROM users WHERE id = ?',
-    [req.params.id],
-    (err, row) => {
-      if (err || !row) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json({ balance: row.balance });
-    }
-  );
-});
-
-// ========== BETNEX GAME ENDPOINTS ==========
-
-// Get available games
-app.get('/api/provider/games', async (req, res) => {
-  try {
-    if (!betnex) {
-      // Demo games if no Betnex
-      return res.json({
-        games: [
-          { id: 'plinko', name: 'Plinko', provider: 'BetVora Demo', icon: '🟢' },
-          { id: 'mines', name: 'Mines', provider: 'BetVora Demo', icon: '💣' },
-          { id: 'crash', name: 'Crash', provider: 'BetVora Demo', icon: '🚀' },
-          { id: 'dice', name: 'Dice', provider: 'BetVora Demo', icon: '🎲' },
-          { id: 'slots', name: 'Slots', provider: 'BetVora Demo', icon: '🎰' },
-        ]
-      });
-    }
-    
-    // Real games from Betnex
-    const games = await betnex.getGames({
-      providers: ['SPRIBE', 'PRAGMATIC', 'EVOLUTION'],
-      limit: 50,
-    });
-    
-    res.json({ games: games });
-  } catch (error) {
-    console.error('Error fetching games:', error);
-    res.status(500).json({ error: 'Failed to fetch games' });
-  }
-});
-
-// Launch a game
-app.post('/api/provider/launch', async (req, res) => {
-  try {
-    const { gameId, bet, userId } = req.body;
-    
-    // Get user balance
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
-        if (err) reject(err);
-        resolve(row);
-      });
-    });
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    if (bet > user.balance) {
-      return res.status(400).json({ error: 'Insufficient balance' });
-    }
-    
-    // Deduct bet immediately
-    db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId]);
-    
-    // Record transaction
-    db.run(
-      'INSERT INTO transactions (user_id, type, amount, game) VALUES (?, ?, ?, ?)',
-      [userId, 'bet', -bet, 'game_' + gameId]
-    );
-    
-    if (!betnex) {
-      // Demo mode
-      return res.json({
-        gameUrl: null,
-        isDemo: true,
-        gameId: gameId,
-      });
-    }
-    
-    // Launch real game with Betnex
-    const launch = await betnex.launchGame({
-      username: user.username,
-      gameId: gameId,
-      money: user.balance - bet,
-      platform: 1,
-      currency: 'USD',
-      home_url: 'https://yourdomain.com',
-      lang: 'en',
-    });
-    
-    res.json({
-      gameUrl: launch.payload.game_launch_url,
-      isDemo: false,
-    });
-  } catch (error) {
-    console.error('Error launching game:', error);
-    res.status(500).json({ error: 'Failed to launch game' });
-  }
-});
-
-// ========== BETNEX WEBHOOK ==========
-app.post('/api/betnex/callback', (req, res) => {
-  const callback = req.body;
-  console.log('Betnex callback:', callback);
-  
-  // Process win/loss
-  const { serialNumber, memberAccount, betAmount, winAmount, status } = callback;
-  
-  if (status === 'completed') {
-    // Update user balance with winnings
-    db.get('SELECT id FROM users WHERE username = ?', [memberAccount], (err, user) => {
-      if (user) {
-        const netChange = winAmount - betAmount;
-        db.run('UPDATE users SET balance = balance + ? WHERE id = ?', [netChange, user.id]);
-        
-        if (winAmount > 0) {
-          db.run(
-            'INSERT INTO transactions (user_id, type, amount, game) VALUES (?, ?, ?, ?)',
-            [user.id, 'win', winAmount, 'game']
-          );
-        }
-      }
-    });
+  // Check if email already exists
+  const existing = Object.values(users).find(u => u.email === email);
+  if (existing) {
+    return res.status(400).json({ error: 'Email already registered' });
   }
   
-  res.json({ status: 'ok' });
-});
-
-// ========== START SERVER ==========
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Database: SQLite (betvora.db)`);
-  console.log(`🔗 API: http://localhost:${PORT}/api/test`);
-  console.log(`🎮 Betnex: ${betnex ? '✅ Connected' : '❌ Demo mode'}`);
-});const express = require('express');
-const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
-const { Betnex } = require('@betnex/sdk');
-require('dotenv').config();
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// ========== DATABASE ==========
-const db = new sqlite3.Database('betvora.db');
-
-// Create users table if it doesn't exist
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    email TEXT UNIQUE,
-    password TEXT,
-    balance REAL DEFAULT 100,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// Create transactions table
-db.run(`
-  CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT,
-    amount REAL,
-    game TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  )
-`);
-
-// ========== BETNEX SETUP ==========
-// Check if Betnex API keys exist
-const BETNEX_API_KEY = process.env.BETNEX_API_KEY;
-const BETNEX_SECRET = process.env.BETNEX_SECRET;
-
-let betnex = null;
-if (BETNEX_API_KEY && BETNEX_SECRET) {
-  betnex = new Betnex({
-    apiKey: BETNEX_API_KEY,
-    secret: BETNEX_SECRET,
-  });
-  console.log('✅ Betnex initialized');
-} else {
-  console.log('⚠️ Betnex API keys not found. Games will use demo mode.');
-}
-
-// ========== API ENDPOINTS ==========
-
-// Test endpoint
-app.get('/api/test', (req, res) => {
+  const id = idCounter++;
+  users[id] = { 
+    id, 
+    username, 
+    email, 
+    password, 
+    balance: 100,
+    totalWagered: 0,
+    createdAt: new Date().toISOString()
+  };
+  
   res.json({ 
-    message: 'BetVora API is running! 🚀',
-    betnex: betnex ? 'Connected' : 'Not configured',
-    version: '1.0.0'
+    success: true, 
+    userId: id,
+    username: username,
+    balance: 100
   });
 });
 
-// Register user
-app.post('/api/auth/register', (req, res) => {
-  const { username, email, password } = req.body;
-  
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'All fields required' });
-  }
-  
-  db.run(
-    'INSERT INTO users (username, email, password, balance) VALUES (?, ?, ?, 100)',
-    [username, email, password],
-    function(err) {
-      if (err) {
-        return res.status(400).json({ error: 'Username or email already exists' });
-      }
-      res.json({ 
-        success: true, 
-        userId: this.lastID,
-        username: username,
-        balance: 100
-      });
-    }
-  );
-});
-
-// Login
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   
-  db.get(
-    'SELECT * FROM users WHERE email = ? AND password = ?',
-    [email, password],
-    (err, user) => {
-      if (err || !user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      res.json({
-        success: true,
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        balance: user.balance
-      });
-    }
-  );
-});
-
-// Get user balance
-app.get('/api/user/:id/balance', (req, res) => {
-  db.get(
-    'SELECT balance FROM users WHERE id = ?',
-    [req.params.id],
-    (err, row) => {
-      if (err || !row) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json({ balance: row.balance });
-    }
-  );
-});
-
-// ========== BETNEX GAME ENDPOINTS ==========
-
-// Get available games
-app.get('/api/provider/games', async (req, res) => {
-  try {
-    if (!betnex) {
-      // Demo games if no Betnex
-      return res.json({
-        games: [
-          { id: 'plinko', name: 'Plinko', provider: 'BetVora Demo', icon: '🟢' },
-          { id: 'mines', name: 'Mines', provider: 'BetVora Demo', icon: '💣' },
-          { id: 'crash', name: 'Crash', provider: 'BetVora Demo', icon: '🚀' },
-          { id: 'dice', name: 'Dice', provider: 'BetVora Demo', icon: '🎲' },
-          { id: 'slots', name: 'Slots', provider: 'BetVora Demo', icon: '🎰' },
-        ]
-      });
-    }
-    
-    // Real games from Betnex
-    const games = await betnex.getGames({
-      providers: ['SPRIBE', 'PRAGMATIC', 'EVOLUTION'],
-      limit: 50,
-    });
-    
-    res.json({ games: games });
-  } catch (error) {
-    console.error('Error fetching games:', error);
-    res.status(500).json({ error: 'Failed to fetch games' });
+  const user = Object.values(users).find(u => u.email === email && u.password === password);
+  
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+  
+  res.json({
+    success: true,
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    balance: user.balance
+  });
 });
 
-// Launch a game
-app.post('/api/provider/launch', async (req, res) => {
-  try {
-    const { gameId, bet, userId } = req.body;
-    
-    // Get user balance
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
-        if (err) reject(err);
-        resolve(row);
-      });
+app.get('/api/user/:id/balance', (req, res) => {
+  const user = users[parseInt(req.params.id)];
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  res.json({ balance: user.balance });
+});
+
+// ========== GAME: PLINKO ==========
+app.post('/api/games/plinko', (req, res) => {
+  const { bet, userId } = req.body;
+  
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+  
+  user.balance -= bet;
+  user.totalWagered = (user.totalWagered || 0) + bet;
+  
+  const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
+  const weights = [20, 25, 20, 15, 10, 7, 3];
+  let totalWeight = weights.reduce((a, b) => a + b, 0);
+  let rand = Math.random() * totalWeight;
+  let selected = 0;
+  for (let i = 0; i < weights.length; i++) {
+    rand -= weights[i];
+    if (rand <= 0) { selected = i; break; }
+  }
+  
+  const multiplier = multipliers[selected];
+  const winAmount = bet * multiplier;
+  const isWin = multiplier >= 1.0;
+  
+  if (isWin) {
+    user.balance += winAmount;
+  }
+  
+  res.json({
+    result: {
+      multiplier: multiplier,
+      winAmount: isWin ? winAmount : 0,
+      isWin: isWin
+    },
+    newBalance: user.balance
+  });
+});
+
+// ========== GAME: MINES ==========
+app.post('/api/games/mines', (req, res) => {
+  const { bet, userId, bombs, revealCount } = req.body;
+  
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+  
+  user.balance -= bet;
+  user.totalWagered = (user.totalWagered || 0) + bet;
+  
+  const bombCount = bombs || 5;
+  const revealed = revealCount || 0;
+  
+  // Simulate mine pick
+  const isBomb = Math.random() < (bombCount / 25);
+  
+  if (isBomb) {
+    res.json({
+      result: {
+        isBomb: true,
+        winAmount: 0,
+        isWin: false
+      },
+      newBalance: user.balance
     });
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    if (bet > user.balance) {
-      return res.status(400).json({ error: 'Insufficient balance' });
-    }
-    
-    // Deduct bet immediately
-    db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId]);
-    
-    // Record transaction
-    db.run(
-      'INSERT INTO transactions (user_id, type, amount, game) VALUES (?, ?, ?, ?)',
-      [userId, 'bet', -bet, 'game_' + gameId]
-    );
-    
-    if (!betnex) {
-      // Demo mode
-      return res.json({
-        gameUrl: null,
-        isDemo: true,
-        gameId: gameId,
-      });
-    }
-    
-    // Launch real game with Betnex
-    const launch = await betnex.launchGame({
-      username: user.username,
-      gameId: gameId,
-      money: user.balance - bet,
-      platform: 1,
-      currency: 'USD',
-      home_url: 'https://yourdomain.com',
-      lang: 'en',
-    });
+  } else {
+    const multiplier = 1 + (revealed + 1) * 0.2;
+    const winAmount = bet * multiplier;
+    user.balance += winAmount;
     
     res.json({
-      gameUrl: launch.payload.game_launch_url,
-      isDemo: false,
+      result: {
+        isBomb: false,
+        winAmount: winAmount,
+        isWin: true,
+        multiplier: multiplier
+      },
+      newBalance: user.balance
     });
-  } catch (error) {
-    console.error('Error launching game:', error);
-    res.status(500).json({ error: 'Failed to launch game' });
   }
 });
 
-// ========== BETNEX WEBHOOK ==========
-app.post('/api/betnex/callback', (req, res) => {
-  const callback = req.body;
-  console.log('Betnex callback:', callback);
+// ========== GAME: DICE ==========
+app.post('/api/games/dice', (req, res) => {
+  const { bet, userId } = req.body;
   
-  // Process win/loss
-  const { serialNumber, memberAccount, betAmount, winAmount, status } = callback;
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
   
-  if (status === 'completed') {
-    // Update user balance with winnings
-    db.get('SELECT id FROM users WHERE username = ?', [memberAccount], (err, user) => {
-      if (user) {
-        const netChange = winAmount - betAmount;
-        db.run('UPDATE users SET balance = balance + ? WHERE id = ?', [netChange, user.id]);
-        
-        if (winAmount > 0) {
-          db.run(
-            'INSERT INTO transactions (user_id, type, amount, game) VALUES (?, ?, ?, ?)',
-            [user.id, 'win', winAmount, 'game']
-          );
-        }
-      }
-    });
+  user.balance -= bet;
+  user.totalWagered = (user.totalWagered || 0) + bet;
+  
+  const roll = Math.random() * 100;
+  const isWin = roll < 50;
+  const multiplier = 1.98;
+  const winAmount = isWin ? bet * multiplier : 0;
+  
+  if (isWin) {
+    user.balance += winAmount;
   }
   
-  res.json({ status: 'ok' });
+  res.json({
+    result: {
+      roll: roll,
+      multiplier: multiplier,
+      winAmount: winAmount,
+      isWin: isWin
+    },
+    newBalance: user.balance
+  });
+});
+
+// ========== GAME: SLOTS ==========
+app.post('/api/games/slots', (req, res) => {
+  const { bet, userId } = req.body;
+  
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+  
+  user.balance -= bet;
+  user.totalWagered = (user.totalWagered || 0) + bet;
+  
+  const symbols = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
+  const s1 = symbols[Math.floor(Math.random() * symbols.length)];
+  const s2 = symbols[Math.floor(Math.random() * symbols.length)];
+  const s3 = symbols[Math.floor(Math.random() * symbols.length)];
+  
+  let multiplier = 0;
+  if (s1 === s2 && s2 === s3) multiplier = 5.0;
+  else if (s1 === s2 || s2 === s3) multiplier = 1.5;
+  
+  const winAmount = multiplier > 0 ? bet * multiplier : 0;
+  
+  if (winAmount > 0) {
+    user.balance += winAmount;
+  }
+  
+  res.json({
+    result: {
+      symbols: [s1, s2, s3],
+      multiplier: multiplier,
+      winAmount: winAmount,
+      isWin: winAmount > 0
+    },
+    newBalance: user.balance
+  });
+});
+
+// ========== GAME: CRASH ==========
+app.post('/api/games/crash', (req, res) => {
+  const { bet, userId, action } = req.body;
+  
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  if (action === 'start') {
+    if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+    user.balance -= bet;
+    user.totalWagered = (user.totalWagered || 0) + bet;
+    
+    const crashPoint = 1.0 + Math.random() * 14;
+    
+    res.json({
+      result: {
+        action: 'start',
+        crashPoint: crashPoint,
+        bet: bet
+      },
+      newBalance: user.balance
+    });
+  } else if (action === 'cashout') {
+    const { multiplier } = req.body;
+    const winAmount = bet * multiplier;
+    user.balance += winAmount;
+    
+    res.json({
+      result: {
+        action: 'cashout',
+        winAmount: winAmount,
+        multiplier: multiplier,
+        isWin: true
+      },
+      newBalance: user.balance
+    });
+  }
+});
+
+// ========== GAME: WHEEL ==========
+app.post('/api/games/wheel', (req, res) => {
+  const { bet, userId } = req.body;
+  
+  const user = users[parseInt(userId)];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (bet > user.balance) return res.status(400).json({ error: 'Insufficient balance' });
+  
+  user.balance -= bet;
+  user.totalWagered = (user.totalWagered || 0) + bet;
+  
+  const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
+  const weights = [20, 25, 20, 15, 10, 7, 3];
+  let totalWeight = weights.reduce((a, b) => a + b, 0);
+  let rand = Math.random() * totalWeight;
+  let selected = 0;
+  for (let i = 0; i < weights.length; i++) {
+    rand -= weights[i];
+    if (rand <= 0) { selected = i; break; }
+  }
+  
+  const multiplier = multipliers[selected];
+  const winAmount = bet * multiplier;
+  const isWin = multiplier >= 1.0;
+  
+  if (isWin) {
+    user.balance += winAmount;
+  }
+  
+  res.json({
+    result: {
+      multiplier: multiplier,
+      winAmount: isWin ? winAmount : 0,
+      isWin: isWin,
+      segment: selected
+    },
+    newBalance: user.balance
+  });
+});
+
+// ========== BETNEX PLACEHOLDER (Coming Soon) ==========
+app.get('/api/provider/games', (req, res) => {
+  res.json({
+    games: [
+      { id: 'plinko', name: 'Plinko', provider: 'BetVora', icon: '🟢' },
+      { id: 'mines', name: 'Mines', provider: 'BetVora', icon: '💣' },
+      { id: 'dice', name: 'Dice', provider: 'BetVora', icon: '🎲' },
+      { id: 'slots', name: 'Slots', provider: 'BetVora', icon: '🎰' },
+      { id: 'crash', name: 'Crash', provider: 'BetVora', icon: '🚀' },
+      { id: 'wheel', name: 'Wheel', provider: 'BetVora', icon: '🎡' }
+    ]
+  });
+});
+
+app.post('/api/provider/launch', (req, res) => {
+  res.json({
+    gameUrl: null,
+    isDemo: true,
+    message: 'Betnex not configured yet'
+  });
 });
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Database: SQLite (betvora.db)`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`👥 Users registered: ${Object.keys(users).length}`);
   console.log(`🔗 API: http://localhost:${PORT}/api/test`);
-  console.log(`🎮 Betnex: ${betnex ? '✅ Connected' : '❌ Demo mode'}`);
 });
