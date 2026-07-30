@@ -7,7 +7,6 @@
     <meta name="description" content="BetVora – Premium Crypto Gaming Platform. Play Plinko, Mines, Slots, Crash, and more with real cryptocurrency." />
     <meta name="google-site-verification" content="fce99d6282b5e84c" />
 
-    <!-- Google Fonts & Libraries -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" />
@@ -2692,9 +2691,10 @@
                 authToken = data.token;
                 localStorage.setItem('authToken', authToken);
                 currentUser.isLoggedIn = true;
-                currentUser.name = data.user.username;
-                userBalance = data.user.balance;
-                triggerToast(`Welcome ${data.user.username}! 🎉`, 'win');
+                currentUser.id = data.userId;
+                currentUser.name = data.username;
+                userBalance = data.balance;
+                triggerToast(`Welcome ${data.username}! 🎉`, 'win');
                 closeModal('authModal');
                 updateUI();
                 saveState();
@@ -2723,9 +2723,10 @@
                 authToken = data.token;
                 localStorage.setItem('authToken', authToken);
                 currentUser.isLoggedIn = true;
-                currentUser.name = data.user.username;
-                userBalance = data.user.balance;
-                triggerToast(`Welcome back, ${data.user.username}! 🔄`, 'win');
+                currentUser.id = data.id;
+                currentUser.name = data.username;
+                userBalance = data.balance;
+                triggerToast(`Welcome back, ${data.username}! 🔄`, 'win');
                 closeModal('authModal');
                 updateUI();
                 saveState();
@@ -2757,15 +2758,13 @@
         }
 
         // ======================================================
-        // 4. BETNEX GAME FUNCTIONS - FIXED
+        // 4. BETNEX GAME FUNCTIONS
         // ======================================================
 
-        // Load games from Betnex - FIXED
         async function loadBetnexGames() {
             try {
                 console.log('🔄 Loading Betnex games...');
                 
-                // Check if container exists, if not create it
                 let container = document.getElementById('betnexGamesContainer');
                 if (!container) {
                     console.log('⚠️ Container not found, creating it...');
@@ -2775,7 +2774,6 @@
                         return;
                     }
                     
-                    // Create the container
                     const betnexBlock = document.createElement('div');
                     betnexBlock.className = 'section-block';
                     betnexBlock.innerHTML = `
@@ -2802,12 +2800,10 @@
                 }
                 
                 container.innerHTML = '';
-                // Show ALL games in a scrollable horizontal row
                 games.forEach(game => {
                     const card = document.createElement('div');
                     card.className = 'betnex-game-card';
                     
-                    // Get game icon/emoji based on provider
                     let icon = '🎰';
                     const provider = (game.provider || '').toLowerCase();
                     if (provider.includes('pragmatic')) icon = '🎰';
@@ -2849,13 +2845,16 @@
             }
         }
 
-        // Launch a Betnex game
         async function launchBetnexGame(gameId) {
             try {
+                if (!currentUser.isLoggedIn) {
+                    triggerToast('Please login first', 'loss');
+                    return;
+                }
+                
                 const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
                 if (!bet || bet <= 0) return;
                 
-                // Check if user has enough balance
                 if (bet > userBalance) {
                     triggerToast('Insufficient balance', 'loss');
                     return;
@@ -2863,14 +2862,17 @@
                 
                 const response = await apiCall('/provider/launch', {
                     method: 'POST',
-                    body: JSON.stringify({ gameId, bet })
+                    body: JSON.stringify({ 
+                        gameId, 
+                        bet,
+                        userId: currentUser.id
+                    })
                 });
                 
-                // If it's a demo game, update balance directly
                 if (response.isDemo) {
                     userBalance = response.newBalance;
                     updateBalance();
-                    if (response.result.isWin) {
+                    if (response.result && response.result.isWin) {
                         triggerToast(`🎰 ${response.result.multiplier}x! +$${response.result.winAmount.toFixed(2)}`, 'win');
                         playSound('win');
                         fireConfetti(20);
@@ -2883,16 +2885,15 @@
                     return;
                 }
                 
-                // Open real game in new window
                 window.open(response.gameUrl, '_blank');
                 
             } catch (error) {
-                alert('Error launching game: ' + error.message);
+                triggerToast('Error launching game: ' + error.message, 'loss');
             }
         }
 
         // ======================================================
-        // 5. GAME FUNCTIONS
+        // 5. GAME FUNCTIONS - FIXED WITH USER ID
         // ======================================================
 
         function dropPlinko() {
@@ -2907,7 +2908,10 @@
             showLoading(true);
             apiCall('/games/plinko', {
                 method: 'POST',
-                body: JSON.stringify({ bet })
+                body: JSON.stringify({ 
+                    bet: bet,
+                    userId: currentUser.id
+                })
             })
             .then(data => {
                 userBalance = data.newBalance;
@@ -2937,6 +2941,230 @@
                 document.getElementById('plinkoStatusText').textContent = 'Error! Try again.';
                 document.getElementById('plinkoDropVisual').textContent = '⚪';
             });
+        }
+
+        function spinSlots() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('slotsBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            showLoading(true);
+            apiCall('/games/slots', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    bet: bet,
+                    userId: currentUser.id
+                })
+            })
+            .then(data => {
+                userBalance = data.newBalance;
+                updateBalance();
+                showLoading(false);
+                
+                const symbols = data.result.symbols;
+                document.getElementById('r1').textContent = symbols[0];
+                document.getElementById('r2').textContent = symbols[1];
+                document.getElementById('r3').textContent = symbols[2];
+                
+                if (data.result.isWin) {
+                    triggerToast(`🎰 ${data.result.multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
+                    playSound('win');
+                    if (data.result.multiplier >= 5) {
+                        fireConfetti(50);
+                        playSound('jackpot');
+                    } else {
+                        fireConfetti(15);
+                    }
+                    addBetHistory('Slots', bet, data.result.winAmount, true);
+                    addTransaction('game_win', data.result.winAmount, 'Slots win');
+                    recordLiveBet('Slots', currentUser.name, bet, data.result.multiplier, true);
+                } else {
+                    triggerToast(`💔 No win this time`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Slots', bet, 0, false);
+                }
+                updateDegenerateStats();
+                saveState();
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast('Error: ' + err.message, 'loss');
+            });
+        }
+
+        function rollDice() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('diceBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            showLoading(true);
+            apiCall('/games/dice', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    bet: bet,
+                    userId: currentUser.id
+                })
+            })
+            .then(data => {
+                userBalance = data.newBalance;
+                updateBalance();
+                showLoading(false);
+                
+                document.getElementById('diceResultDisplay').textContent = data.result.roll.toFixed(2);
+                
+                if (data.result.isWin) {
+                    triggerToast(`🎲 +$${data.result.winAmount.toFixed(2)}!`, 'win');
+                    playSound('win');
+                    fireConfetti(15);
+                    addBetHistory('Dice', bet, data.result.winAmount, true);
+                    addTransaction('game_win', data.result.winAmount, 'Dice win');
+                    recordLiveBet('Dice', currentUser.name, bet, data.result.multiplier, true);
+                } else {
+                    triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Dice', bet, 0, false);
+                }
+                updateDegenerateStats();
+                saveState();
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast('Error: ' + err.message, 'loss');
+            });
+        }
+
+        function spinWheel() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('wheelBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            showLoading(true);
+            apiCall('/games/wheel', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    bet: bet,
+                    userId: currentUser.id
+                })
+            })
+            .then(data => {
+                userBalance = data.newBalance;
+                updateBalance();
+                showLoading(false);
+                
+                document.getElementById('wheelResult').textContent = `${data.result.multiplier}x!`;
+                
+                if (data.result.isWin) {
+                    triggerToast(`🎡 ${data.result.multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
+                    playSound('win');
+                    if (data.result.multiplier >= 5) {
+                        fireConfetti(50);
+                        playSound('jackpot');
+                    } else {
+                        fireConfetti(20);
+                    }
+                    addBetHistory('Wheel', bet, data.result.winAmount, true);
+                    addTransaction('game_win', data.result.winAmount, 'Wheel win');
+                    recordLiveBet('Wheel', currentUser.name, bet, data.result.multiplier, true);
+                } else {
+                    triggerToast(`💔 ${data.result.multiplier}x - Lost $${bet.toFixed(2)}`, 'loss');
+                    playSound('loss');
+                    addBetHistory('Wheel', bet, 0, false);
+                }
+                updateDegenerateStats();
+                saveState();
+            })
+            .catch(err => {
+                showLoading(false);
+                triggerToast('Error: ' + err.message, 'loss');
+            });
+        }
+
+        function startMines() {
+            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
+            const bet = parseFloat(document.getElementById('minesBet').value);
+            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
+            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
+
+            const bombs = parseInt(document.getElementById('minesBombs').value);
+            
+            userBalance -= bet;
+            updateUserWagered(bet);
+            minesBet = bet;
+            updateBalance();
+
+            minesState = Array(25).fill('gem');
+            let placed = 0;
+            while (placed < bombs) {
+                const r = Math.floor(Math.random() * 25);
+                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
+            }
+
+            safeRevealed = 0;
+            minesActive = true;
+            initMinesGrid();
+
+            document.getElementById('startMinesBtn').style.display = 'none';
+            document.getElementById('cashoutMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
+            triggerToast(`💣 ${bombs} bombs placed! Click tiles to reveal gems.`, 'gold');
+        }
+
+        function initMinesGrid() {
+            const grid = document.getElementById('minesGrid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const t = document.createElement('div');
+                t.className = 'mine-tile';
+                t.textContent = '❓';
+                t.onclick = () => pickMine(i, t);
+                grid.appendChild(t);
+            }
+        }
+
+        function pickMine(idx, el) {
+            if (!minesActive || el.classList.contains('revealed-gem')) return;
+
+            if (minesState[idx] === 'bomb') {
+                el.classList.add('revealed-bomb');
+                el.textContent = '💣';
+                minesActive = false;
+                triggerToast('💥 Hit a mine!', 'loss');
+                playSound('loss');
+                addBetHistory('Mines', minesBet, 0, false);
+                document.getElementById('startMinesBtn').style.display = 'block';
+                document.getElementById('cashoutMinesBtn').style.display = 'none';
+                updateDegenerateStats();
+                saveState();
+            } else {
+                el.classList.add('revealed-gem');
+                el.textContent = '💎';
+                safeRevealed++;
+                const mult = (1 + safeRevealed * 0.2);
+                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
+            }
+        }
+
+        function cashoutMines() {
+            if (!minesActive) return;
+            const mult = (1 + safeRevealed * 0.2);
+            const win = minesBet * mult;
+            userBalance += win;
+            updateBalance();
+            minesActive = false;
+            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
+            playSound('win');
+            fireConfetti(15);
+            addTopMultiplier(currentUser.name, win, mult);
+            addBetHistory('Mines', minesBet, win, true);
+            addTransaction('game_win', win, 'Mines win');
+            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
+            document.getElementById('startMinesBtn').style.display = 'block';
+            document.getElementById('cashoutMinesBtn').style.display = 'none';
+            updateDegenerateStats();
+            saveState();
         }
 
         // ======================================================
@@ -3018,7 +3246,7 @@
                 });
             });
 
-            // Add Betnex games container at the bottom with scrollable horizontal layout
+            // Add Betnex games container
             const betnexBlock = document.createElement('div');
             betnexBlock.className = 'section-block';
             betnexBlock.innerHTML = `
@@ -3034,7 +3262,7 @@
         }
 
         // ======================================================
-        // 7. UPDATE UI - FIXED
+        // 7. UPDATE UI
         // ======================================================
 
         function updateUI() {
@@ -3061,7 +3289,6 @@
                 if (registerBtn) registerBtn.style.display = 'inline-flex';
             }
             
-            // Load Betnex games when logged in
             if (currentUser.isLoggedIn) {
                 setTimeout(() => {
                     loadBetnexGames();
@@ -3070,7 +3297,7 @@
         }
 
         // ======================================================
-        // 8. ALL ORIGINAL FUNCTIONS BELOW
+        // 8. ALL ORIGINAL FUNCTIONS BELOW (unchanged)
         // ======================================================
 
         // NAME ARRAYS
@@ -3258,6 +3485,7 @@
         // APP STATE
         let userBalance = 0.00;
         let currentUser = {
+            id: null,
             name: 'Guest',
             level: 'Starter',
             isLoggedIn: false,
@@ -3322,6 +3550,7 @@
                     }
                     if (data.isLoggedIn) {
                         currentUser.isLoggedIn = data.isLoggedIn;
+                        currentUser.id = data.id || null;
                         currentUser.name = data.name || 'Guest';
                         currentUser.level = data.level || 'Starter';
                         currentUser.email = data.email || '';
@@ -3362,6 +3591,7 @@
                 localStorage.setItem('betvora_current_user', JSON.stringify({
                     usernameChangeTimestamp: usernameChangeTimestamp,
                     isLoggedIn: currentUser.isLoggedIn,
+                    id: currentUser.id,
                     name: currentUser.name,
                     level: currentUser.level,
                     email: currentUser.email,
@@ -3515,10 +3745,7 @@
             saveState();
         }
 
-        // ======================================================
-        // 9. UPDATE BONUS UI - FIXED
-        // ======================================================
-
+        // UPDATE BONUS UI
         function updateBonusUI() {
             const tier = getCurrentTier();
             const bar = document.getElementById('bonusProgressBar');
@@ -3530,6 +3757,8 @@
             const rewardEl = document.getElementById('bonusReward');
             const claimBtn = document.getElementById('bonusClaimBtn');
             const claimedText = document.getElementById('bonusClaimedText');
+
+            if (!bar || !fill) return;
 
             if (!tier) {
                 if (label) label.textContent = '🏆 All Complete!';
@@ -3600,8 +3829,6 @@
             BONUS_TIERS.forEach((tier, index) => {
                 const isCompleted = currentUser.completedTiers.includes(tier.id);
                 const isActive = index === currentUser.currentBonusTier;
-                const isLocked = index > currentUser.currentBonusTier;
-
                 const progress = isCompleted ? 100 : isActive ? Math.min((currentUser.bonusProgress / tier.wager) * 100, 100) : 0;
                 const isReady = isActive && currentUser.bonusProgress >= tier.wager;
 
@@ -4423,170 +4650,8 @@
         }
 
         // MINES GRID INIT
-        function initMinesGrid() {
-            const grid = document.getElementById('minesGrid');
-            grid.innerHTML = '';
-            for (let i = 0; i < 25; i++) {
-                const t = document.createElement('div');
-                t.className = 'mine-tile';
-                t.textContent = '❓';
-                t.onclick = () => pickMine(i, t);
-                grid.appendChild(t);
-            }
-        }
-
         // SLOTS SYMBOLS
         const slotSyms = ['💎', '7️⃣', '🔔', '🍒', '⭐', '🎰'];
-
-        function startMines() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('minesBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            minesBet = bet;
-            updateBalance();
-
-            const bombsCount = parseInt(document.getElementById('minesBombs').value);
-            minesState = Array(25).fill('gem');
-            let placed = 0;
-            while (placed < bombsCount) {
-                const r = Math.floor(Math.random() * 25);
-                if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
-            }
-
-            safeRevealed = 0;
-            minesActive = true;
-            initMinesGrid();
-
-            document.getElementById('startMinesBtn').style.display = 'none';
-            document.getElementById('cashoutMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${minesBet.toFixed(2)})`;
-        }
-
-        function pickMine(idx, el) {
-            if (!minesActive || el.classList.contains('revealed-gem')) return;
-
-            if (minesState[idx] === 'bomb') {
-                el.classList.add('revealed-bomb');
-                el.textContent = '💣';
-                minesActive = false;
-                triggerToast('💥 Hit a mine!', 'loss');
-                playSound('loss');
-                addBetHistory('Mines', minesBet, 0, false);
-                document.getElementById('startMinesBtn').style.display = 'block';
-                document.getElementById('cashoutMinesBtn').style.display = 'none';
-                updateDegenerateStats();
-                saveState();
-            } else {
-                el.classList.add('revealed-gem');
-                el.textContent = '💎';
-                safeRevealed++;
-                const mult = (1 + safeRevealed * 0.2);
-                document.getElementById('cashoutMinesBtn').textContent = `Cashout ($${(minesBet * mult).toFixed(2)})`;
-            }
-        }
-
-        function cashoutMines() {
-            if (!minesActive) return;
-            const mult = (1 + safeRevealed * 0.2);
-            const win = minesBet * mult;
-            userBalance += win;
-            updateBalance();
-            minesActive = false;
-            triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
-            playSound('win');
-            fireConfetti(15);
-            addTopMultiplier(currentUser.name, win, mult);
-            addBetHistory('Mines', minesBet, win, true);
-            addTransaction('game_win', win, 'Mines win');
-            recordLiveBet('Mines', currentUser.name, minesBet, mult, true);
-            document.getElementById('startMinesBtn').style.display = 'block';
-            document.getElementById('cashoutMinesBtn').style.display = 'none';
-            updateDegenerateStats();
-            saveState();
-        }
-
-        function spinSlots() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('slotsBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const s1 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s2 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-            const s3 = slotSyms[Math.floor(Math.random() * slotSyms.length)];
-
-            document.getElementById('r1').textContent = s1;
-            document.getElementById('r2').textContent = s2;
-            document.getElementById('r3').textContent = s3;
-
-            let mult = 0;
-            if (s1 === s2 && s2 === s3) mult = 5.0;
-            else if (s1 === s2 || s2 === s3) mult = 1.5;
-
-            if (mult > 0) {
-                const win = bet * mult;
-                userBalance += win;
-                triggerToast(`🎰 +$${win.toFixed(2)}!`, 'win');
-                playSound('win');
-                if (mult >= 5) {
-                    fireConfetti(50);
-                    playSound('jackpot');
-                    addTopMultiplier(currentUser.name, win, mult);
-                } else {
-                    fireConfetti(15);
-                }
-                addBetHistory('Slots', bet, win, true);
-                addTransaction('game_win', win, 'Slots win');
-                recordLiveBet('Slots', currentUser.name, bet, mult, true);
-            } else {
-                triggerToast(`💔 No win this time`, 'loss');
-                playSound('loss');
-                addBetHistory('Slots', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
-
-        function rollDice() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('diceBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            const roll = (Math.random() * 100).toFixed(2);
-            document.getElementById('diceResultDisplay').textContent = roll;
-
-            const win = parseFloat(roll) < 50;
-            if (win) {
-                const winAmt = bet * 1.98;
-                userBalance += winAmt;
-                triggerToast(`🎲 +$${winAmt.toFixed(2)}`, 'win');
-                playSound('win');
-                fireConfetti(15);
-                addTopMultiplier(currentUser.name, winAmt, 1.98);
-                addBetHistory('Dice', bet, winAmt, true);
-                addTransaction('game_win', winAmt, 'Dice win');
-                recordLiveBet('Dice', currentUser.name, bet, 1.98, true);
-            } else {
-                triggerToast(`💔 Lost $${bet.toFixed(2)}`, 'loss');
-                playSound('loss');
-                addBetHistory('Dice', bet, 0, false);
-            }
-            updateBalance();
-            updateDegenerateStats();
-            saveState();
-        }
 
         // CRASH
         let crashActive = false;
@@ -5077,64 +5142,6 @@
             updateBalance();
             updateDegenerateStats();
             saveState();
-        }
-
-        // WHEEL
-        function spinWheel() {
-            if (!currentUser.isLoggedIn) { triggerToast('Please login first', 'loss'); return; }
-            const bet = parseFloat(document.getElementById('wheelBet').value);
-            if (isNaN(bet) || bet <= 0 || bet > userBalance) { triggerToast('Insufficient balance', 'loss'); return; }
-            if (bet < 0.10) { triggerToast('Minimum bet is $0.10', 'loss'); return; }
-
-            userBalance -= bet;
-            updateUserWagered(bet);
-            updateBalance();
-
-            const multipliers = [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0];
-            const weights = [20, 25, 20, 15, 10, 7, 3];
-            let totalWeight = weights.reduce((a, b) => a + b, 0);
-            let rand = Math.random() * totalWeight;
-            let selected = 0;
-            for (let i = 0; i < weights.length; i++) {
-                rand -= weights[i];
-                if (rand <= 0) { selected = i; break; }
-            }
-
-            const mult = multipliers[selected];
-            const win = bet * mult;
-            const wheel = document.getElementById('wheelSpin');
-
-            const spins = 5 + Math.random() * 5;
-            const degrees = spins * 360 + (selected / multipliers.length) * 360;
-            wheel.style.transform = `rotate(${degrees}deg)`;
-
-            document.getElementById('wheelResult').textContent = '🎡 Spinning...';
-
-            setTimeout(() => {
-                if (mult >= 1) {
-                    userBalance += win;
-                    triggerToast(`🎡 ${mult}x! Won +$${win.toFixed(2)}`, 'win');
-                    playSound('win');
-                    if (mult >= 5) {
-                        fireConfetti(50);
-                        playSound('jackpot');
-                        addTopMultiplier(currentUser.name, win, mult);
-                    } else {
-                        fireConfetti(20);
-                    }
-                    addBetHistory('Wheel', bet, win, true);
-                    addTransaction('game_win', win, 'Wheel win');
-                    recordLiveBet('Wheel', currentUser.name, bet, mult, true);
-                } else {
-                    triggerToast(`💔 ${mult}x - Lost $${bet.toFixed(2)}`, 'loss');
-                    playSound('loss');
-                    addBetHistory('Wheel', bet, 0, false);
-                }
-                updateBalance();
-                document.getElementById('wheelResult').textContent = `🎯 ${mult}x! ${mult >= 1 ? '+$' + win.toFixed(2) : 'Lost $' + bet.toFixed(2)}`;
-                updateDegenerateStats();
-                saveState();
-            }, 4000);
         }
 
         // SEARCH
