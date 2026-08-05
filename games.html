@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BetVora — Games (Plinko / Mines / Dice)</title>
+  <link rel="stylesheet" href="/assets/games.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="left-panel">
+      <div class="brand">BetVora <span>Games</span></div>
+
+      <div class="control-group">
+        <label>Balance</label>
+        <div id="balance" class="balance">$0.00</div>
+      </div>
+
+      <div class="control-group">
+        <label>Bet Amount</label>
+        <input id="betAmount" type="number" min="0" step="0.01" value="1.00" />
+      </div>
+
+      <div class="control-group">
+        <label>Game</label>
+        <select id="gameSelect">
+          <option value="plinko">Plinko</option>
+          <option value="mines">Mines</option>
+          <option value="dice">Dice</option>
+        </select>
+      </div>
+
+      <div id="gameOptions"></div>
+
+      <div class="control-group">
+        <button id="actionBtn" class="btn-primary">Play</button>
+      </div>
+
+      <div class="control-group">
+        <button id="demoLogin" class="btn-outline">Demo Login</button>
+      </div>
+
+      <div class="control-group small muted">
+        <div id="lastResult">No plays yet</div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <div id="plinkoView" class="game-view">
+        <canvas id="plinkoCanvas"></canvas>
+        <div id="plinkoBottom" class="plinko-bottom"></div>
+      </div>
+
+      <div id="minesView" class="game-view hidden">
+        <div id="minesGrid" class="mines-grid"></div>
+      </div>
+
+      <div id="diceView" class="game-view hidden">
+        <div class="dice-container">
+          <div id="diceSlider" class="dice-slider"></div>
+          <div id="diceRollValue" class="dice-value">—</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/public/js/init.js"></script>
+  <script src="/public/js/plinko.js"></script>
+  <script src="/public/js/mines.js"></script>
+  <script src="/public/js/dice.js"></script>
+  <script>
+    // small initializer wiring
+    (function(){
+      const gs = document.getElementById('gameSelect');
+      const views = { plinko: document.getElementById('plinkoView'), mines: document.getElementById('minesView'), dice: document.getElementById('diceView') };
+      const options = document.getElementById('gameOptions');
+      const betInput = document.getElementById('betAmount');
+      const actionBtn = document.getElementById('actionBtn');
+
+      function showGame(name){
+        Object.keys(views).forEach(k=>views[k].classList.add('hidden'));
+        views[name].classList.remove('hidden');
+        options.innerHTML = '';
+        if(name==='plinko'){
+          options.innerHTML = '<label>Rows</label><select id="plinkoRows"><option>8</option><option selected>16</option><option>24</option></select>';
+        } else if(name==='mines'){
+          options.innerHTML = '<label>Grid</label><select id="minesGridSize"><option value="25">5x5</option><option value="36">6x6</option></select><label>Mines</label><input id="minesCount" type="number" min="1" max="20" value="5" />';
+        } else if(name==='dice'){
+          options.innerHTML = '<label>Target (roll under)</label><input id="diceTarget" type="number" min="1" max="99.99" step="0.01" value="50" />';
+        }
+      }
+
+      gs.addEventListener('change', e=> showGame(e.target.value));
+      showGame(gs.value);
+
+      actionBtn.addEventListener('click', async ()=>{
+        const game = gs.value;
+        const bet = parseFloat(betInput.value)||0;
+        const userId = localStorage.getItem('bv_userId');
+        if(!userId){ alert('Please Demo Login first'); return; }
+
+        if(game==='plinko'){
+          const rows = parseInt(document.getElementById('plinkoRows').value,10)||16;
+          await window.BVPlinko.play({bet,userId,rows});
+        } else if(game==='mines'){
+          // build interactive: open grid and let user click tiles
+          const gridSize = parseInt(document.getElementById('minesGridSize').value,10)||25;
+          const mines = parseInt(document.getElementById('minesCount').value,10)||5;
+          window.BVMines.setup({bet,userId,gridSize,mines});
+        } else if(game==='dice'){
+          const target = parseFloat(document.getElementById('diceTarget').value)||50;
+          await window.BVDice.play({bet,userId,target});
+        }
+      });
+
+      document.getElementById('demoLogin').addEventListener('click', async ()=>{
+        await window.BVAuth.demoLogin();
+        document.getElementById('balance').innerText = '$' + (window.BVAuth.balance||0).toFixed(2);
+      });
+
+      // expose small API to update balance and last result
+      window.BVEvents = {
+        updateBalance(b){ document.getElementById('balance').innerText = '$'+(b||0).toFixed(2); },
+        setLast(s){ document.getElementById('lastResult').innerText = s; }
+      };
+
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+/* games.css — dark theme for games */
+:root{
+  --bg:#0b0f1a; --panel:#15192a; --muted:#8b94a6; --accent:#00e699; --blue:#0075ff; --card:#131728;
+}
+html,body{height:100%;}
+body{margin:0;background:linear-gradient(180deg,var(--bg),#071022);font-family:Plus Jakarta Sans, sans-serif;color:#fff}
+.app-shell{display:flex;height:100vh}
+.left-panel{width:300px;background:var(--panel);padding:20px;box-shadow:inset -1px 0 0 rgba(255,255,255,0.03)}
+.brand{font-weight:900;font-size:1.2rem;margin-bottom:16px}
+.brand span{color:var(--accent);margin-left:8px}
+.control-group{margin-bottom:14px}
+.control-group label{display:block;color:var(--muted);font-size:0.75rem;margin-bottom:6px}
+.balance{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;font-weight:900}
+input[type=number], select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff}
+.btn-primary{background:linear-gradient(180deg,var(--blue),#005ce6);border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:900}
+.btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:8px;color:var(--muted);cursor:pointer}
+.small{font-size:0.82rem}
+.muted{color:var(--muted)}
+.main-area{flex:1;padding:28px;display:flex;align-items:flex-start;justify-content:center}
+.game-view{width:100%;height:86vh;display:flex;align-items:center;justify-content:center;position:relative}
+.hidden{display:none}
+#plinkoCanvas{width:920px;height:720px;background:transparent;border-radius:8px}
+.plinko-bottom{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
+.plinko-slot{width:44px;height:36px;border-radius:8px;background:linear-gradient(180deg,#ff7a00,#ff3a3a);display:flex;align-items:center;justify-content:center;font-weight:900;color:#111}
+.mines-grid{display:grid;grid-template-columns:repeat(5,64px);gap:14px}
+.mines-tile{width:64px;height:64px;background:rgba(255,255,255,0.06);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer}
+.mines-tile.revealed{background:rgba(255,255,255,0.9);color:#111}
+.dice-container{width:720px}
+.dice-slider{height:18px;border-radius:12px;background:linear-gradient(90deg,#ff6b3b 0%, #ff6b3b 49%, #3be67a 49%, #3be67a 100%);position:relative}
+.dice-value{margin-top:12px;text-align:center;font-size:1.6rem;font-weight:900}
