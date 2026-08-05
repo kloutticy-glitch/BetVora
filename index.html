@@ -517,17 +517,6 @@
             min-height: 100px;
         }
 
-        .game-thumb-card .card-img-banner {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            transition: transform 0.4s ease;
-        }
-        .game-thumb-card:hover .card-img-banner {
-            transform: scale(1.05);
-        }
-
         .game-thumb-card .card-info {
             padding: 8px 10px;
             background: var(--bg-card);
@@ -1795,70 +1784,143 @@
             background: #1a1035;
         }
 
-        /* ======================== UPGRADED GAME STYLES ======================== */
-
+        /* ======================== PLINKO STYLES ======================== */
         .plinko-container {
-            max-width: 720px;
+            max-width: 700px;
             margin: 0 auto;
-            padding: 12px;
+            padding: 16px;
             background: var(--bg-card);
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             border: 1px solid var(--border);
         }
-
-        .plinko-controls-top {
+        .plinko-top {
             display: flex;
-            gap: 16px;
+            gap: 20px;
             flex-wrap: wrap;
             justify-content: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
-
-        .plinko-board-wrapper {
+        .plinko-bet, .plinko-rows {
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 4px;
         }
-
-        #plinkoCanvas {
-            width: 100%;
-            max-width: 620px;
-            height: auto;
-            background: var(--panel);
-            border-radius: var(--radius-md);
+        .plinko-bet label, .plinko-rows label {
+            color: var(--text-muted);
+            font-size: 0.55rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .bet-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .bet-controls button {
+            background: rgba(255,255,255,0.05);
             border: 1px solid var(--border);
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
         }
-
-        .vol-btn, .row-btn {
+        .bet-controls input {
+            width: 80px;
+            text-align: center;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: #fff;
+            padding: 4px 6px;
+            font-weight: 700;
+        }
+        .row-buttons {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .row-btn {
             background: rgba(255,255,255,0.05);
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 4px;
-            font-size: 0.55rem;
-            font-weight: 700;
+            font-size: 0.6rem;
             cursor: pointer;
-            transition: all 0.2s;
+            font-weight: 700;
         }
-        .vol-btn:hover, .row-btn:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .vol-btn.active, .row-btn.active {
+        .row-btn.active {
             background: var(--brand-green);
             color: #000;
             border-color: var(--brand-green);
         }
+        .plinko-board {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #plinkoCanvas {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            background: var(--panel);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        #plinkoResultDisplay {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: var(--brand-green);
+            margin-top: 4px;
+        }
+        .plinko-drop {
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .plinko-drop button {
+            padding: 8px 40px;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 6px;
+            background: var(--brand-green);
+            color: #000;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .plinko-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            padding: 6px 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+        }
+        .plinko-info button {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.5rem;
+            cursor: pointer;
+        }
 
-        /* ======================== MINES ======================== */
+        /* ======================== MINES STYLES ======================== */
         .mines-container {
             max-width: 620px;
             margin: 0 auto;
-            padding: 12px;
+            padding: 16px;
             background: var(--bg-card);
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             border: 1px solid var(--border);
         }
-
         .mines-multipliers {
             display: flex;
             justify-content: center;
@@ -1875,7 +1937,6 @@
             color: var(--brand-gold);
             border: 1px solid rgba(255,215,0,0.1);
         }
-
         .mines-grid-wrapper {
             display: flex;
             justify-content: center;
@@ -1910,7 +1971,6 @@
             border-color: var(--brand-red);
             background: rgba(255,0,0,0.15);
         }
-
         .mines-controls {
             display: flex;
             gap: 12px;
@@ -1948,13 +2008,13 @@
             border-color: var(--brand-green);
         }
 
-        /* ======================== DICE ======================== */
+        /* ======================== DICE STYLES ======================== */
         .dice-container {
             max-width: 500px;
             margin: 0 auto;
             padding: 20px;
             background: var(--bg-card);
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             border: 1px solid var(--border);
             text-align: center;
         }
@@ -1990,7 +2050,6 @@
             display: block;
         }
 
-        /* ======================== RESPONSIVE ======================== */
         @media (max-width: 1024px) {
             .hero-wrapper { grid-template-columns: 1fr; }
             sidebar { display: none; }
@@ -2130,7 +2189,6 @@
         </sidebar>
 
         <main>
-            <!-- HERO SECTION -->
             <div class="hero-wrapper">
                 <div class="hero-banner-left">
                     <h1>BetVora</h1>
@@ -2156,7 +2214,6 @@
                 </div>
             </div>
 
-            <!-- BONUS PROGRESS BAR -->
             <div class="bonus-progress-bar" id="bonusProgressBar">
                 <div class="label">
                     🎯 <span id="bonusTierLabel">Tier 1</span>
@@ -2170,7 +2227,6 @@
                 <span class="claimed-text" id="bonusClaimedText" style="display:none;">✅ Claimed!</span>
             </div>
 
-            <!-- DEGENERATE STATS -->
             <div class="deg-stats-bar">
                 <div class="deg-stat-card">
                     <div class="stat-number zero" id="degWagered">$0</div>
@@ -2190,13 +2246,11 @@
                 </div>
             </div>
 
-            <!-- TOP MULTIPLIERS -->
             <div class="top-multipliers-bar">
                 <div class="top-multipliers-label">🔥 Top Multipliers</div>
                 <div class="multiplier-scroll-track" id="multipliersTrack"></div>
             </div>
 
-            <!-- TRENDING -->
             <div class="trending-now-section">
                 <div class="trending-label">📈 Trending</div>
                 <div class="trending-games" id="trendingGames">
@@ -2207,7 +2261,6 @@
                 </div>
             </div>
 
-            <!-- LIVE WINS -->
             <div class="live-wins-bar">
                 <div class="live-wins-label">
                     <div class="dot-pulse"></div> Live Wins
@@ -2215,9 +2268,7 @@
                 <div class="wins-scroll-track" id="winsTrack"></div>
             </div>
 
-            <!-- ==================== GAME PAGES (FULL SCREEN) ==================== -->
-
-            <!-- PLINKO -->
+            <!-- ==================== PLINKO (FULL PAGE) ==================== -->
             <div class="game-stage-modal" id="stagePlinko">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="font-family:'Syne'; font-size:1rem;">🟢 PLINKO</h3>
@@ -2225,77 +2276,56 @@
                 </div>
 
                 <div class="plinko-container">
-                    <!-- Top Controls -->
-                    <div class="plinko-controls-top">
-                        <!-- Bet -->
-                        <div style="display:flex; flex-direction:column; align-items:center;">
-                            <span style="color:var(--text-muted); font-size:0.5rem; font-weight:700;">BET</span>
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <button class="btn btn-sm" onclick="adjustPlinkoBet(-0.50)">−</button>
-                                <input type="number" id="plinkoBet" value="1.00" min="0.10" step="0.50" style="width:80px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 6px; color:#fff;">
-                                <button class="btn btn-sm" onclick="adjustPlinkoBet(0.50)">+</button>
+                    <div class="plinko-top">
+                        <div class="plinko-bet">
+                            <label>BET</label>
+                            <div class="bet-controls">
+                                <button onclick="adjustPlinkoBet(-0.50)">−</button>
+                                <input type="number" id="plinkoBet" value="1.00" min="0.10" step="0.50">
+                                <button onclick="adjustPlinkoBet(0.50)">+</button>
                             </div>
-                            <div style="display:flex; gap:3px; margin-top:2px;">
-                                <button class="btn btn-xs" onclick="quickBet('plinkoBet',25)">25%</button>
-                                <button class="btn btn-xs" onclick="quickBet('plinkoBet',50)">50%</button>
-                                <button class="btn btn-xs" onclick="quickBet('plinkoBet',75)">75%</button>
-                                <button class="btn btn-xs" onclick="quickBet('plinkoBet',100)">100%</button>
+                            <div class="quick-bets">
+                                <button onclick="quickBet('plinkoBet',25)">25%</button>
+                                <button onclick="quickBet('plinkoBet',50)">50%</button>
+                                <button onclick="quickBet('plinkoBet',75)">75%</button>
+                                <button onclick="quickBet('plinkoBet',100)">100%</button>
                             </div>
                         </div>
 
-                        <!-- Volatility -->
-                        <div style="display:flex; flex-direction:column; align-items:center;">
-                            <span style="color:var(--text-muted); font-size:0.5rem; font-weight:700;">VOLATILITY</span>
-                            <div style="display:flex; gap:3px; margin-top:2px;">
-                                <button class="btn vol-btn active" data-vol="low" onclick="setPlinkoVolatility('low')" style="font-size:0.5rem; padding:2px 10px;">Low</button>
-                                <button class="btn vol-btn" data-vol="medium" onclick="setPlinkoVolatility('medium')" style="font-size:0.5rem; padding:2px 10px;">Medium</button>
-                                <button class="btn vol-btn" data-vol="high" onclick="setPlinkoVolatility('high')" style="font-size:0.5rem; padding:2px 10px;">High</button>
-                            </div>
-                        </div>
-
-                        <!-- Rows -->
-                        <div style="display:flex; flex-direction:column; align-items:center;">
-                            <span style="color:var(--text-muted); font-size:0.5rem; font-weight:700;">ROWS</span>
-                            <div style="display:flex; gap:2px; flex-wrap:wrap; margin-top:2px; max-width:200px; justify-content:center;">
-                                <button class="btn row-btn active" data-rows="8" onclick="setPlinkoRows(8)">8</button>
-                                <button class="btn row-btn" data-rows="9" onclick="setPlinkoRows(9)">9</button>
-                                <button class="btn row-btn" data-rows="10" onclick="setPlinkoRows(10)">10</button>
-                                <button class="btn row-btn" data-rows="11" onclick="setPlinkoRows(11)">11</button>
-                                <button class="btn row-btn" data-rows="12" onclick="setPlinkoRows(12)">12</button>
-                                <button class="btn row-btn" data-rows="13" onclick="setPlinkoRows(13)">13</button>
-                                <button class="btn row-btn" data-rows="14" onclick="setPlinkoRows(14)">14</button>
-                                <button class="btn row-btn" data-rows="15" onclick="setPlinkoRows(15)">15</button>
-                                <button class="btn row-btn" data-rows="16" onclick="setPlinkoRows(16)">16</button>
+                        <div class="plinko-rows">
+                            <label>ROWS</label>
+                            <div class="row-buttons">
+                                <button class="row-btn active" onclick="setPlinkoRows(8)">8</button>
+                                <button class="row-btn" onclick="setPlinkoRows(9)">9</button>
+                                <button class="row-btn" onclick="setPlinkoRows(10)">10</button>
+                                <button class="row-btn" onclick="setPlinkoRows(11)">11</button>
+                                <button class="row-btn" onclick="setPlinkoRows(12)">12</button>
+                                <button class="row-btn" onclick="setPlinkoRows(13)">13</button>
+                                <button class="row-btn" onclick="setPlinkoRows(14)">14</button>
+                                <button class="row-btn" onclick="setPlinkoRows(15)">15</button>
+                                <button class="row-btn" onclick="setPlinkoRows(16)">16</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Plinko Board -->
-                    <div class="plinko-board-wrapper">
-                        <canvas id="plinkoCanvas" width="600" height="500"></canvas>
-                        <div id="plinkoResultDisplay" style="text-align:center; font-size:1.2rem; font-weight:900; margin-top:4px; color:var(--brand-green);">—</div>
+                    <div class="plinko-board">
+                        <canvas id="plinkoCanvas" width="600" height="480"></canvas>
+                        <div id="plinkoResultDisplay">—</div>
                     </div>
 
-                    <!-- Bottom Controls -->
-                    <div style="display:flex; justify-content:center; gap:8px; margin-top:10px; flex-wrap:wrap;">
-                        <button class="btn" style="font-size:0.6rem;">Manual</button>
-                        <button class="btn" style="font-size:0.6rem;">Auto</button>
-                        <button class="btn" style="font-size:0.6rem;">Hold & Drop</button>
-                        <button class="btn btn-green" onclick="dropPlinkoCanvas()" style="padding:8px 32px; font-size:0.8rem;">▶ DROP</button>
+                    <div class="plinko-drop">
+                        <button onclick="dropPlinkoCanvas()">▶ DROP</button>
                     </div>
 
-                    <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="plinkoBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
-                    </div>
-
-                    <div style="margin-top:8px; padding:4px 10px; background:rgba(0,0,0,0.3); border-radius:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:0.5rem;">
-                        <span style="color:var(--text-muted);">🔐 <span id="plinkoHash" style="color:var(--brand-green); font-family:monospace;">—</span></span>
-                        <button class="btn btn-sm" onclick="verifyGame()" style="font-size:0.45rem; padding:2px 8px;">VERIFY</button>
+                    <div class="plinko-info">
+                        <span>Balance: $<span id="plinkoBalance">0.00</span></span>
+                        <span>🔐 <span id="plinkoHash">—</span></span>
+                        <button onclick="verifyGame()">Verify</button>
                     </div>
                 </div>
             </div>
 
-            <!-- ==================== MINES ==================== -->
+            <!-- ==================== MINES (FULL PAGE) ==================== -->
             <div class="game-stage-modal" id="stageMines">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="font-family:'Syne'; font-size:1rem;">💣 MINES</h3>
@@ -2303,7 +2333,6 @@
                 </div>
 
                 <div class="mines-container">
-                    <!-- Multipliers -->
                     <div class="mines-multipliers" id="minesMultipliers">
                         <span class="mines-mult" id="minesMult1">1.00x</span>
                         <span class="mines-mult" id="minesMult2">1.50x</span>
@@ -2312,12 +2341,10 @@
                         <span class="mines-mult" id="minesMult5">5.00x</span>
                     </div>
 
-                    <!-- Grid -->
                     <div class="mines-grid-wrapper">
                         <div class="mines-grid" id="minesGrid"></div>
                     </div>
 
-                    <!-- Controls -->
                     <div class="mines-controls">
                         <div class="control-group">
                             <label>Grid Size</label>
@@ -2329,11 +2356,11 @@
                         </div>
                         <div class="control-group">
                             <label>Bet Amount</label>
-                            <input type="number" id="minesBet" value="1.00" min="0.10" step="0.5" style="width:90px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:#fff;">
+                            <input type="number" id="minesBet" value="1.00" min="0.10" step="0.5">
                         </div>
                         <div class="control-group">
                             <label>Bombs</label>
-                            <select id="minesBombs" style="padding:4px 8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; color:#fff;">
+                            <select id="minesBombs">
                                 <option value="3">3</option>
                                 <option value="5" selected>5</option>
                                 <option value="10">10</option>
@@ -2342,19 +2369,18 @@
                         </div>
                     </div>
 
-                    <!-- Action Buttons -->
                     <div style="display:flex; gap:8px; justify-content:center; margin-top:12px; flex-wrap:wrap;">
                         <button class="btn btn-green" id="startMinesBtn" onclick="startMines()" style="padding:8px 32px; font-size:0.8rem;">▶ BET</button>
                         <button class="btn btn-gold" id="cashoutMinesBtn" onclick="cashoutMines()" style="display:none; padding:8px 32px; font-size:0.8rem;">💎 CASHOUT</button>
                     </div>
 
                     <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="minesBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
+                        Balance: $<span id="minesBalance">0.00</span>
                     </div>
                 </div>
             </div>
 
-            <!-- ==================== DICE ==================== -->
+            <!-- ==================== DICE (FULL PAGE) ==================== -->
             <div class="game-stage-modal" id="stageDice">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="font-family:'Syne'; font-size:1rem;">🎲 DICE</h3>
@@ -2369,7 +2395,7 @@
                     <div class="dice-roll-display" id="diceResultDisplay">50.00</div>
 
                     <div class="dice-slider-container">
-                        <input type="range" id="diceSlider" min="0" max="100" value="50" disabled style="width:100%; max-width:300px;">
+                        <input type="range" id="diceSlider" min="0" max="100" value="50" disabled>
                         <div style="display:flex; justify-content:space-between; font-size:0.5rem; color:var(--text-muted); max-width:300px; margin:0 auto;">
                             <span>0</span>
                             <span>50</span>
@@ -2380,13 +2406,13 @@
                     <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:12px;">
                         <div style="display:flex; align-items:center; gap:6px;">
                             <span style="color:var(--text-muted); font-size:0.55rem;">Bet</span>
-                            <input type="number" id="diceBet" value="1.00" min="0.10" step="0.5" style="width:80px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:#fff;">
+                            <input type="number" id="diceBet" value="1.00" min="0.10" step="0.5">
                         </div>
                         <button class="btn btn-green" onclick="rollDiceCanvas()" style="padding:8px 28px; font-size:0.8rem;">▶ ROLL</button>
                     </div>
 
                     <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="diceBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
+                        Balance: $<span id="diceBalance">0.00</span>
                     </div>
 
                     <div style="margin-top:8px; padding:4px 10px; background:rgba(0,0,0,0.3); border-radius:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:0.5rem;">
@@ -2409,11 +2435,11 @@
                         <div class="reel" id="r3">🔔</div>
                     </div>
                     <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-                        <input type="number" id="slotsBet" value="1.00" min="0.10" step="0.5" style="width:80px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:#fff;">
-                        <button class="btn btn-green" onclick="spinSlots()" style="padding:8px 28px; font-size:0.8rem;">▶ SPIN</button>
+                        <input type="number" id="slotsBet" value="1.00" min="0.10" step="0.5">
+                        <button class="btn btn-green" onclick="spinSlots()">▶ SPIN</button>
                     </div>
                     <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="slotsBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
+                        Balance: $<span id="slotsBalance">0.00</span>
                     </div>
                 </div>
             </div>
@@ -2430,13 +2456,13 @@
                         <div id="crashBarFill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--brand-green), var(--brand-gold)); border-radius:4px; transition:width 0.1s;"></div>
                     </div>
                     <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;">
-                        <input type="number" id="crashBet" value="1.00" min="0.10" step="0.5" style="width:80px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:#fff;">
-                        <button class="btn btn-green" id="crashStartBtn" onclick="startCrash()" style="padding:8px 28px; font-size:0.8rem;">🚀 FLY</button>
-                        <button class="btn btn-gold" id="crashCashoutBtn" onclick="cashoutCrash()" style="display:none; padding:8px 28px; font-size:0.8rem;">💎 CASHOUT</button>
+                        <input type="number" id="crashBet" value="1.00" min="0.10" step="0.5">
+                        <button class="btn btn-green" id="crashStartBtn" onclick="startCrash()">🚀 FLY</button>
+                        <button class="btn btn-gold" id="crashCashoutBtn" onclick="cashoutCrash()" style="display:none;">💎 CASHOUT</button>
                     </div>
                     <div style="font-size:0.65rem; color:var(--text-muted); margin-top:8px;" id="crashStatus">Place your bet and fly!</div>
                     <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="crashBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
+                        Balance: $<span id="crashBalance">0.00</span>
                     </div>
                 </div>
             </div>
@@ -2451,16 +2477,15 @@
                     <div style="font-size:4rem; margin-bottom:10px;" id="wheelSpin">🎡</div>
                     <div style="font-size:1.2rem; font-weight:900; color:var(--brand-green);" id="wheelResult">Spin!</div>
                     <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;">
-                        <input type="number" id="wheelBet" value="1.00" min="0.10" step="0.5" style="width:80px; text-align:center; font-weight:800; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:#fff;">
-                        <button class="btn btn-gold" onclick="spinWheel()" style="padding:8px 28px; font-size:0.8rem;">🎡 SPIN</button>
+                        <input type="number" id="wheelBet" value="1.00" min="0.10" step="0.5">
+                        <button class="btn btn-gold" onclick="spinWheel()">🎡 SPIN</button>
                     </div>
                     <div style="text-align:center; margin-top:8px; font-size:0.65rem; color:var(--text-muted);">
-                        Balance: <span id="wheelBalance" style="color:var(--brand-green); font-weight:900;">$0.00</span>
+                        Balance: $<span id="wheelBalance">0.00</span>
                     </div>
                 </div>
             </div>
 
-            <!-- ==================== CATALOG ==================== -->
             <div id="catalogSectionsContainer"></div>
         </main>
     </div>
@@ -2844,7 +2869,6 @@
         async function loadBetnexGames() {
             try {
                 console.log('🔄 Loading Betnex games...');
-                
                 let container = document.getElementById('betnexGamesContainer');
                 if (!container) {
                     console.log('⚠️ Container not found, creating it...');
@@ -2853,7 +2877,6 @@
                         console.error('❌ Catalog container not found!');
                         return;
                     }
-                    
                     const betnexBlock = document.createElement('div');
                     betnexBlock.className = 'section-block';
                     betnexBlock.innerHTML = `
@@ -2868,22 +2891,17 @@
                     catalogContainer.appendChild(betnexBlock);
                     container = document.getElementById('betnexGamesContainer');
                 }
-                
                 const response = await apiCall('/provider/games');
                 console.log('📦 Response:', response);
-                
                 const games = response.games || [];
-                
                 if (games.length === 0) {
                     container.innerHTML = '<p style="color:var(--text-muted);padding:20px;width:100%;text-align:center;">No games available. Add your Betnex API key!</p>';
                     return;
                 }
-                
                 container.innerHTML = '';
                 games.forEach(game => {
                     const card = document.createElement('div');
                     card.className = 'betnex-game-card';
-                    
                     let icon = '🎰';
                     const provider = (game.provider || '').toLowerCase();
                     if (provider.includes('pragmatic')) icon = '🎰';
@@ -2896,7 +2914,6 @@
                     else if (game.name && game.name.toLowerCase().includes('mines')) icon = '💣';
                     else if (game.name && game.name.toLowerCase().includes('crash')) icon = '🚀';
                     else if (game.name && game.name.toLowerCase().includes('dice')) icon = '🎲';
-                    
                     card.innerHTML = `
                         <div class="game-thumb">
                             <div style="font-size:2.5rem;">${icon}</div>
@@ -2910,11 +2927,9 @@
                             <div class="play-btn" onclick="event.stopPropagation(); launchBetnexGame('${game.id}')">▶ PLAY</div>
                         </div>
                     `;
-                    
                     card.onclick = () => launchBetnexGame(game.id);
                     container.appendChild(card);
                 });
-                
                 console.log(`✅ Loaded ${games.length} games!`);
             } catch (error) {
                 console.error('❌ Failed to load games:', error);
@@ -2931,24 +2946,16 @@
                     triggerToast('Please login first', 'loss');
                     return;
                 }
-                
                 const bet = parseFloat(prompt('Enter bet amount:', '1.00'));
                 if (!bet || bet <= 0) return;
-                
                 if (bet > userBalance) {
                     triggerToast('Insufficient balance', 'loss');
                     return;
                 }
-                
                 const response = await apiCall('/provider/launch', {
                     method: 'POST',
-                    body: JSON.stringify({ 
-                        gameId, 
-                        bet,
-                        userId: currentUser.id
-                    })
+                    body: JSON.stringify({ gameId, bet, userId: currentUser.id })
                 });
-                
                 if (response.isDemo) {
                     userBalance = response.newBalance;
                     updateBalance();
@@ -2964,9 +2971,7 @@
                     }
                     return;
                 }
-                
                 window.open(response.gameUrl, '_blank');
-                
             } catch (error) {
                 triggerToast('Error launching game: ' + error.message, 'loss');
             }
@@ -2984,7 +2989,6 @@
                 triggerToast('No game to verify', 'loss');
                 return;
             }
-            
             showLoading(true);
             apiCall('/verify', {
                 method: 'POST',
@@ -3011,13 +3015,11 @@
                 triggerToast('Please login first', 'loss');
                 return;
             }
-            
             const newSeed = document.getElementById('clientSeedInput').value.trim();
             if (!newSeed || newSeed.length < 3) {
                 triggerToast('Seed must be at least 3 characters', 'loss');
                 return;
             }
-            
             showLoading(true);
             apiCall('/user/update-seed', {
                 method: 'POST',
@@ -3041,12 +3043,10 @@
         }
 
         // ============================================================
-        // PLINKO CANVAS FUNCTIONS
+        // PLINKO FUNCTIONS
         // ============================================================
 
         let plinkoRows = 8;
-        let plinkoCanvas = null;
-        let plinkoCtx = null;
         let plinkoAnimating = false;
 
         function setPlinkoRows(rows) {
@@ -3057,50 +3057,33 @@
             drawPlinkoBoard();
         }
 
-        function setPlinkoVolatility(level) {
-            document.querySelectorAll('.vol-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.vol === level);
-            });
-            // Volatility changes multiplier ranges
-            drawPlinkoBoard();
-        }
-
         function adjustPlinkoBet(amount) {
             const input = document.getElementById('plinkoBet');
             let val = parseFloat(input.value) + amount;
             if (val < 0.10) val = 0.10;
             if (val > userBalance) val = userBalance;
             input.value = val.toFixed(2);
-            document.getElementById('plinkoBetDisplay').textContent = val.toFixed(2);
         }
 
         function drawPlinkoBoard() {
             const canvas = document.getElementById('plinkoCanvas');
             if (!canvas) return;
-            
             const ctx = canvas.getContext('2d');
             const rect = canvas.getBoundingClientRect();
             const width = rect.width || 600;
-            const height = rect.height || 500;
+            const height = rect.height || 480;
             canvas.width = width;
             canvas.height = height;
-            plinkoCtx = ctx;
-            plinkoCanvas = canvas;
-            
             ctx.clearRect(0, 0, width, height);
-            
             const rows = plinkoRows;
             const cols = rows + 1;
             const spacingX = width / (cols + 1);
             const spacingY = (height - 60) / (rows + 1.5);
             const startY = 20;
-            
-            // Draw pegs
             for (let row = 0; row < rows; row++) {
                 const y = startY + row * spacingY;
                 const pegsInRow = row + 1;
                 const offsetX = (width - (pegsInRow - 1) * spacingX) / 2;
-                
                 for (let col = 0; col < pegsInRow; col++) {
                     const x = offsetX + col * spacingX;
                     ctx.beginPath();
@@ -3112,16 +3095,12 @@
                     ctx.stroke();
                 }
             }
-            
-            // Draw multiplier slots at bottom
             const bottomY = startY + rows * spacingY + 10;
             const multipliers = getPlinkoMultipliers(rows);
             const slotWidth = width / multipliers.length;
-            
             for (let i = 0; i < multipliers.length; i++) {
                 const x = i * slotWidth + slotWidth / 2;
                 const mult = multipliers[i];
-                
                 let color = '#4a5568';
                 let textColor = '#fff';
                 if (mult >= 20) { color = '#ff3cac'; textColor = '#fff'; }
@@ -3130,12 +3109,10 @@
                 else if (mult >= 2) { color = '#6b8cff'; textColor = '#fff'; }
                 else if (mult >= 1) { color = '#00e699'; textColor = '#000'; }
                 else { color = '#4a5568'; textColor = '#fff'; }
-                
                 ctx.fillStyle = color + '60';
                 ctx.beginPath();
                 ctx.roundRect ? ctx.roundRect(x - slotWidth/2 + 4, bottomY, slotWidth - 8, 28, 4) : ctx.rect(x - slotWidth/2 + 4, bottomY, slotWidth - 8, 28);
                 ctx.fill();
-                
                 ctx.fillStyle = textColor;
                 ctx.font = 'bold 10px sans-serif';
                 ctx.textAlign = 'center';
@@ -3171,32 +3148,24 @@
 
             apiCall('/games/plinko', {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    bet: bet,
-                    userId: currentUser.id,
-                    rows: plinkoRows
-                })
+                body: JSON.stringify({ bet: bet, userId: currentUser.id, rows: plinkoRows })
             })
             .then(data => {
                 userBalance = data.newBalance;
                 updateBalance();
-                document.getElementById('plinkoBalance').textContent = `$${userBalance.toFixed(2)}`;
-                
+                document.getElementById('plinkoBalance').textContent = userBalance.toFixed(2);
                 if (data.result.hash) {
                     document.getElementById('plinkoHash').textContent = data.result.hash.substring(0, 16) + '...';
                     lastSessionId = data.result.sessionId;
                     lastGameHash = data.result.hash;
                 }
-                
                 const multiplier = data.result.multiplier;
                 const multipliers = getPlinkoMultipliers(plinkoRows);
                 const index = multipliers.indexOf(multiplier);
                 const finalIndex = index !== -1 ? index : Math.floor(multipliers.length / 2);
-                
                 animatePlinkoDrop(finalIndex, plinkoRows, () => {
                     document.getElementById('plinkoResultDisplay').textContent = `${multiplier}x`;
                     document.getElementById('plinkoResultDisplay').style.color = multiplier >= 1 ? 'var(--brand-green)' : 'var(--brand-red)';
-                    
                     if (data.result.isWin) {
                         triggerToast(`🎯 ${multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
                         playSound('win');
@@ -3223,22 +3192,19 @@
 
         function animatePlinkoDrop(targetIndex, rows, callback) {
             const canvas = document.getElementById('plinkoCanvas');
-            const ctx = plinkoCtx;
+            const ctx = canvas.getContext('2d');
             const width = canvas.width;
             const height = canvas.height;
             const cols = rows + 1;
             const spacingX = width / (cols + 1);
             const spacingY = (height - 60) / (rows + 1.5);
             const startY = 20;
-            
             const path = [];
             let currentCol = Math.floor(cols / 2);
-            
             for (let row = 0; row < rows; row++) {
                 const pegsInRow = row + 1;
                 const offsetX = (width - (pegsInRow - 1) * spacingX) / 2;
                 const y = startY + row * spacingY;
-                
                 const colDiff = targetIndex - currentCol;
                 const move = colDiff > 0 ? 1 : (colDiff < 0 ? -1 : (Math.random() > 0.5 ? 1 : -1));
                 if (Math.abs(colDiff) > 0) {
@@ -3247,24 +3213,19 @@
                     currentCol += (Math.random() > 0.5 ? 1 : -1);
                 }
                 currentCol = Math.max(0, Math.min(pegsInRow - 1, currentCol));
-                
                 const x = offsetX + currentCol * spacingX;
                 path.push({ x, y });
             }
-            
             const bottomY = startY + rows * spacingY + 10;
             const multipliers = getPlinkoMultipliers(rows);
             const slotWidth = width / multipliers.length;
             const finalX = targetIndex * slotWidth + slotWidth / 2;
             path.push({ x: finalX, y: bottomY + 20 });
-            
             let step = 0;
             const ballRadius = 8;
             const totalSteps = path.length + 10;
-            
             plinkoAnimating = true;
             drawPlinkoBoard();
-            
             function animateStep() {
                 if (step >= totalSteps) {
                     plinkoAnimating = false;
@@ -3280,20 +3241,16 @@
                     if (callback) callback();
                     return;
                 }
-                
                 drawPlinkoBoard();
-                
                 const progress = step / totalSteps;
                 const pathIndex = Math.floor(progress * path.length);
                 const nextIndex = Math.min(pathIndex + 1, path.length - 1);
                 const t = (progress * path.length) % 1;
-                
                 if (pathIndex < path.length - 1) {
                     const p1 = path[pathIndex];
                     const p2 = path[nextIndex];
                     const x = p1.x + (p2.x - p1.x) * t;
                     const y = p1.y + (p2.y - p1.y) * t;
-                    
                     ctx.beginPath();
                     ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
                     ctx.fillStyle = '#00e699';
@@ -3303,11 +3260,9 @@
                     ctx.fill();
                     ctx.shadowBlur = 0;
                 }
-                
                 step++;
                 setTimeout(animateStep, 50);
             }
-            
             animateStep();
         }
 
@@ -3353,28 +3308,23 @@
             const bombs = parseInt(document.getElementById('minesBombs').value);
             const size = minesGridSize;
             const total = size * size;
-            
             userBalance -= bet;
             updateUserWagered(bet);
             minesBetAmount = bet;
             updateBalance();
-            document.getElementById('minesBalance').textContent = `$${userBalance.toFixed(2)}`;
-
+            document.getElementById('minesBalance').textContent = userBalance.toFixed(2);
             minesState = Array(total).fill('gem');
             let placed = 0;
             while (placed < bombs) {
                 const r = Math.floor(Math.random() * total);
                 if (minesState[r] !== 'bomb') { minesState[r] = 'bomb'; placed++; }
             }
-
             safeRevealed = 0;
             minesActive = true;
             initMinesGrid();
-
             document.getElementById('startMinesBtn').style.display = 'none';
             document.getElementById('cashoutMinesBtn').style.display = 'inline-flex';
             document.getElementById('cashoutMinesBtn').textContent = `💎 CASHOUT ($${minesBetAmount.toFixed(2)})`;
-            
             updateMinesMultipliers(0, bombs);
             triggerToast(`💣 ${bombs} bombs placed! Click tiles to reveal gems.`, 'gold');
         }
@@ -3394,7 +3344,6 @@
 
         function pickMine(idx, el) {
             if (!minesActive || el.classList.contains('revealed-gem') || el.classList.contains('revealed-bomb')) return;
-
             if (minesState[idx] === 'bomb') {
                 el.classList.add('revealed-bomb');
                 el.textContent = '💣';
@@ -3414,7 +3363,6 @@
                 const win = minesBetAmount * mult;
                 document.getElementById('cashoutMinesBtn').textContent = `💎 CASHOUT ($${win.toFixed(2)})`;
                 updateMinesMultipliers(safeRevealed, parseInt(document.getElementById('minesBombs').value));
-                
                 const bombs = parseInt(document.getElementById('minesBombs').value);
                 const total = minesGridSize * minesGridSize;
                 if (safeRevealed >= total - bombs) {
@@ -3429,7 +3377,7 @@
             const win = minesBetAmount * mult;
             userBalance += win;
             updateBalance();
-            document.getElementById('minesBalance').textContent = `$${userBalance.toFixed(2)}`;
+            document.getElementById('minesBalance').textContent = userBalance.toFixed(2);
             minesActive = false;
             triggerToast(`💰 Cashed out +$${win.toFixed(2)}`, 'win');
             playSound('win');
@@ -3456,27 +3404,21 @@
             showLoading(true);
             apiCall('/games/dice', {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    bet: bet,
-                    userId: currentUser.id
-                })
+                body: JSON.stringify({ bet: bet, userId: currentUser.id })
             })
             .then(data => {
                 userBalance = data.newBalance;
                 updateBalance();
-                document.getElementById('diceBalance').textContent = `$${userBalance.toFixed(2)}`;
+                document.getElementById('diceBalance').textContent = userBalance.toFixed(2);
                 showLoading(false);
-                
                 const roll = data.result.roll.toFixed(2);
                 document.getElementById('diceResultDisplay').textContent = roll;
                 document.getElementById('diceSlider').value = roll;
-                
                 if (data.result.hash) {
                     document.getElementById('diceHash').textContent = data.result.hash.substring(0, 16) + '...';
                     lastSessionId = data.result.sessionId;
                     lastGameHash = data.result.hash;
                 }
-                
                 if (data.result.isWin) {
                     triggerToast(`🎲 +$${data.result.winAmount.toFixed(2)}!`, 'win');
                     playSound('win');
@@ -3496,7 +3438,9 @@
                 showLoading(false);
                 triggerToast('Error: ' + err.message, 'loss');
             });
-        }        // ============================================================
+        }
+
+        // ============================================================
         // SLOTS FUNCTIONS
         // ============================================================
 
@@ -3511,22 +3455,17 @@
             showLoading(true);
             apiCall('/games/slots', {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    bet: bet,
-                    userId: currentUser.id
-                })
+                body: JSON.stringify({ bet: bet, userId: currentUser.id })
             })
             .then(data => {
                 userBalance = data.newBalance;
                 updateBalance();
-                document.getElementById('slotsBalance').textContent = `$${userBalance.toFixed(2)}`;
+                document.getElementById('slotsBalance').textContent = userBalance.toFixed(2);
                 showLoading(false);
-                
                 const symbols = data.result.symbols;
                 document.getElementById('r1').textContent = symbols[0];
                 document.getElementById('r2').textContent = symbols[1];
                 document.getElementById('r3').textContent = symbols[2];
-                
                 if (data.result.isWin) {
                     triggerToast(`🎰 ${data.result.multiplier}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
                     playSound('win');
@@ -3588,7 +3527,7 @@
             userBalance -= bet;
             updateUserWagered(bet);
             updateBalance();
-            document.getElementById('crashBalance').textContent = `$${userBalance.toFixed(2)}`;
+            document.getElementById('crashBalance').textContent = userBalance.toFixed(2);
 
             crashActive = true;
             crashMultiplier = 1.0;
@@ -3632,7 +3571,7 @@
             const win = crashBetAmount * crashMultiplier;
             userBalance += win;
             updateBalance();
-            document.getElementById('crashBalance').textContent = `$${userBalance.toFixed(2)}`;
+            document.getElementById('crashBalance').textContent = userBalance.toFixed(2);
             triggerToast(`💎 Cashed out at ${crashMultiplier.toFixed(2)}x! +$${win.toFixed(2)}`, 'win');
             playSound('win');
             fireConfetti(30);
@@ -3659,25 +3598,19 @@
             showLoading(true);
             apiCall('/games/wheel', {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    bet: bet,
-                    userId: currentUser.id
-                })
+                body: JSON.stringify({ bet: bet, userId: currentUser.id })
             })
             .then(data => {
                 userBalance = data.newBalance;
                 updateBalance();
-                document.getElementById('wheelBalance').textContent = `$${userBalance.toFixed(2)}`;
+                document.getElementById('wheelBalance').textContent = userBalance.toFixed(2);
                 showLoading(false);
-                
                 const mult = data.result.multiplier;
                 const emojis = ['💀', '🍒', '🍊', '🍋', '🍇', '🎰', '💎'];
                 const spin = document.getElementById('wheelSpin');
                 spin.style.transform = `rotate(${Math.random() * 720 + 360}deg)`;
                 spin.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-                
                 document.getElementById('wheelResult').textContent = `${mult}x!`;
-                
                 if (data.result.isWin) {
                     triggerToast(`🎡 ${mult}x! +$${data.result.winAmount.toFixed(2)}`, 'win');
                     playSound('win');
@@ -3713,14 +3646,10 @@
                 triggerToast('Please login first', 'loss');
                 return;
             }
-            
-            // Hide all game stages first
             document.querySelectorAll('.game-stage-modal').forEach(m => {
                 m.style.display = 'none';
                 m.classList.remove('active');
             });
-            
-            // Show the selected game
             const gameMap = {
                 'plinko': 'stagePlinko',
                 'mines': 'stageMines',
@@ -3729,15 +3658,12 @@
                 'crash': 'stageCrash',
                 'wheel': 'stageWheel'
             };
-            
             const stageId = gameMap[id];
             if (stageId) {
                 const stage = document.getElementById(stageId);
                 if (stage) {
                     stage.style.display = 'block';
                     stage.classList.add('active');
-                    
-                    // Initialize game
                     if (id === 'plinko') setTimeout(drawPlinkoBoard, 200);
                     if (id === 'mines') initMinesGrid();
                 }
@@ -3751,9 +3677,7 @@
                 stage.classList.remove('active');
             }
             if (id === 'stageCrash') resetCrash();
-        }
-
-        // ============================================================
+        }        // ============================================================
         // RENDER CATALOG
         // ============================================================
 
@@ -3865,13 +3789,12 @@
             updateBonusUI();
             document.getElementById('currentClientSeed').textContent = currentUser.clientSeed || '—';
             
-            // Update game balances
-            document.getElementById('plinkoBalance').textContent = `$${userBalance.toFixed(2)}`;
-            document.getElementById('minesBalance').textContent = `$${userBalance.toFixed(2)}`;
-            document.getElementById('diceBalance').textContent = `$${userBalance.toFixed(2)}`;
-            document.getElementById('slotsBalance').textContent = `$${userBalance.toFixed(2)}`;
-            document.getElementById('crashBalance').textContent = `$${userBalance.toFixed(2)}`;
-            document.getElementById('wheelBalance').textContent = `$${userBalance.toFixed(2)}`;
+            document.getElementById('plinkoBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('minesBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('diceBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('slotsBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('crashBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('wheelBalance').textContent = userBalance.toFixed(2);
 
             const loginBtn = document.querySelector('.header-right .btn-primary');
             const registerBtn = document.querySelector('.header-right .btn-green');
@@ -4403,7 +4326,9 @@
                         `Wager <span class="highlight">$${tier.wager}</span> to unlock <span class="highlight-gold">$${tier.reward}</span> bonus`;
                 }
             }
-        }        function openBonusModal() {
+        }
+
+        function openBonusModal() {
             if (!currentUser.isLoggedIn) {
                 triggerToast('Please login first', 'loss');
                 return;
@@ -4638,12 +4563,12 @@
             document.getElementById('withdrawVerifyBalance').textContent = formatted;
             document.getElementById('withdrawVerifyWagered').textContent = `$${totalWagered.toFixed(2)}`;
             
-            document.getElementById('plinkoBalance').textContent = formatted;
-            document.getElementById('minesBalance').textContent = formatted;
-            document.getElementById('diceBalance').textContent = formatted;
-            document.getElementById('slotsBalance').textContent = formatted;
-            document.getElementById('crashBalance').textContent = formatted;
-            document.getElementById('wheelBalance').textContent = formatted;
+            document.getElementById('plinkoBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('minesBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('diceBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('slotsBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('crashBalance').textContent = userBalance.toFixed(2);
+            document.getElementById('wheelBalance').textContent = userBalance.toFixed(2);
             
             saveState();
         }
@@ -4694,9 +4619,7 @@
                     <span style="color:${b.isWin ? 'var(--brand-green)' : 'var(--brand-red)'};">${b.isWin ? '+$' : '-$'}${b.win.toFixed(2)}</span>
                 </div>`
             ).join('');
-        }
-
-        function updateRecentBetsSidebar(game, bet, win, isWin) {
+        }        function updateRecentBetsSidebar(game, bet, win, isWin) {
             const container = document.getElementById('recentBetsSidebar');
             if (!container) return;
             const entry = document.createElement('div');
@@ -5074,7 +4997,9 @@
                 recordLiveBet(game, u, bet, mult, true);
                 scheduleLiveWins();
             }, delay);
-        }        const gamesList = [
+        }
+
+        const gamesList = [
             { id: 'wanted-dead', name: 'Wanted Dead or Wild', cat: 'trending', icon: '🤠', provider: 'Hacksaw Gaming' },
             { id: 'starlight-princess', name: 'Starlight Princess 1000', cat: 'trending', icon: '👸', provider: 'Pragmatic Play' },
             { id: 'gates-olympus', name: 'Gates of Valhalla', cat: 'trending', icon: '🏛️', provider: 'Pragmatic Play' },
